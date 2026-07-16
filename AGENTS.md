@@ -38,7 +38,8 @@ A vendor-coupling gap in the same spirit (e.g. an AI client hard-coding one prov
 
 ```
 apps/api/                  Hono server (deployable)
-  src/index.ts              entrypoint — route composition, exports AppType for RPC clients
+  src/app.ts                 builds and exports the Hono `app` + AppType — no serve()/side effects, so it's importable from tests
+  src/index.ts               process entrypoint only: serve(app) + injectWebSocket(server)
   src/middleware/            cross-cutting Hono middleware
   src/lib/                   HTTP-layer helpers (e.g. response envelope) — not domain logic
   src/modules/<feature>/    one folder per feature slice: *.routes.ts, *.db.ts, *.schema.ts
@@ -51,7 +52,10 @@ packages/db/                Drizzle schema + client, owns migrations
 packages/core/              environment-agnostic logic — no Hono/HTTP/socket imports
   src/auth/                  Better Auth config + access control
   src/errors.ts              AppError + error codes — domain-level, not Hono-specific
+  src/notifications/types.ts NotificationDispatcher interface + NotificationPayload — contract only, no socket import
 ```
+
+`apps/api/src/modules/notifications/websocket-dispatcher.ts` is the concrete implementation of that interface — the reference example for the DIP pattern below: the *interface* lives in `packages/core` (pure contract, generic `TClient` so core never needs to know what a "client" concretely is), the *implementation* that actually touches a transport-layer object (a Hono `WSContext` wrapping a raw socket) lives in `apps/api`. Follow this split for any future interface/adapter pair — don't put the concrete, transport-touching class in `packages/core` just because its interface lives there.
 
 Product-specific domain modules (algorithms, AI agent strategies, etc.) aren't scaffolded yet — see [PROGRESS.md](./PROGRESS.md). When one gets built, it's a new subfolder under `packages/core/src/`, following the same "pure logic, no Hono/HTTP/DB-client imports" rule as everything else in this package; don't invent the folder layout speculatively before there's a real module to put in it.
 
@@ -107,9 +111,19 @@ Then diff the output against `packages/db/src/schema.ts`, merge in whatever chan
 Every response from `apps/api`'s own routes — not `/health` (an infra/ops endpoint) and **not** `/api/auth/**` (Better Auth's own client SDK expects its native shape; wrapping it would break that SDK) — uses one envelope, via `apps/api/src/lib/response.ts`:
 
 - Success: `success(c, data)` → `{ success: true, data }`.
-- Failure: never hand-construct an error response. Either call `failure(c, code, message, status, details?)` directly, or — preferred, since it's the same thing but centralized — `throw new AppError(code, message, details?)` from `@repo/core` and let the global `app.onError()` handler in `apps/api/src/index.ts` format it. `AppError`'s `code` is one of the `ErrorCode` union in `packages/core/src/errors.ts` (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `INTERNAL_ERROR`) — add a new code there, not a bespoke string, if an existing one doesn't fit.
+- Failure: never hand-construct an error response. Either call `failure(c, code, message, status, details?)` directly, or — preferred, since it's the same thing but centralized — `throw new AppError(code, message, details?)` from `@repo/core` and let the global `app.onError()` handler in `apps/api/src/app.ts` format it. `AppError`'s `code` is one of the `ErrorCode` union in `packages/core/src/errors.ts` (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `INTERNAL_ERROR`) — add a new code there, not a bespoke string, if an existing one doesn't fit.
 - `details` on an error is only ever included when `isDev()` is true (`NODE_ENV !== "production"`). Never put anything in `message` that's unsafe to show in production (that's what `details` is for); `message` always ships regardless of environment.
 - Unexpected (non-`AppError`) exceptions still get caught by `app.onError` and shaped into the same envelope with `code: "INTERNAL_ERROR"` — a route handler should never need its own try/catch just to keep the response shape consistent.
+
+## Testing
+
+`apps/api` has two distinct test patterns — use the cheaper one whenever it can actually answer the question, don't default to the heavier one out of habit:
+
+- **Pure unit tests** (e.g. `src/lib/response.test.ts`) — build a small standalone `Hono` instance in the test file itself, drive it with `testClient` from `hono/testing` (`app.fetch` under the hood, no real network socket, no DB). Use this for anything that doesn't need a real session or a real database row — response formatting, pure functions, `AppError` behavior.
+- **Integration tests** (e.g. `src/modules/notifications/websocket.integration.test.ts`, named `*.integration.test.ts` to make the distinction greppable) — import the real `app` from `src/app.ts`, boot it with `serve()` on a dedicated port, and exercise it with real HTTP/WebSocket clients against the real database. Required whenever the thing under test is a security boundary or genuinely depends on Better Auth resolving a real session (which needs a real DB round trip) — a mock would just test the mock. Every integration test must clean up what it creates (delete the user/row it made) in `afterAll`, the same discipline as the manual verification scripts used throughout this repo's history.
+- Both patterns import the real `app`/route/middleware code, never a re-implementation — a test that duplicates the logic it's supposed to be checking can drift from reality and pass while the real thing is broken.
+- `apps/api/vitest.setup.ts` calls `process.loadEnvFile()` against `.env.development` — Vitest's own CLI has no `--env-file` support (same gap that motivated `cross-env` for `NODE_ENV`), so this is how integration tests get `DATABASE_URL` etc.
+- If there's no isolated test database configured, integration tests may run against the dev database instead — but they **must** be self-cleaning (delete every row they create, in `afterAll`, unconditionally) since dev data isn't disposable the way a real test DB's would be. Check [PROGRESS.md](./PROGRESS.md) for whether an isolated test database exists yet before assuming either way.
 
 ## Conventions
 
