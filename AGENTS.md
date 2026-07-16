@@ -116,3 +116,24 @@ Every response from `apps/api`'s own routes — not `/health` (an infra/ops endp
 - TypeScript strict mode everywhere (`tsconfig.base.json`), ESM (`"type": "module"` in every package).
 - Zod v4 (not v3 — `better-auth`'s peer dependency forced this repo-wide; keep all packages on the same major).
 - No comments explaining *what* code does — only *why*, and only when non-obvious (see the caching-order rationale as the model example).
+
+## Keeping the public-facing docs in sync
+
+This repo is published open source (MIT). `README.md` and `CHANGELOG.md` are read by people who aren't in this conversation — unlike `PROGRESS.md` (internal status log) or this file (agent rules), they're the product's own documentation and go stale silently if a change doesn't update them. Concretely, when a change affects any of these, update the doc in the same change, not as a follow-up:
+
+- A new/changed/removed env var, script, or setup step → `README.md`'s relevant section (Environment variables, Getting started, Available scripts).
+- A new architectural decision or convention that changes "how to add a feature" → `README.md`'s Architecture / Adding a new feature sections, *and* the relevant rule section in this file.
+- Anything a consumer of this repo would notice → a `CHANGELOG.md` entry (see below). Purely internal changes with no observable effect (a variable rename, a comment) don't need one.
+
+### Versioning & changelog mechanism
+
+Categorize every notable change the way [Conventional Commits](https://www.conventionalcommits.org/) does, and use the category to decide both the `CHANGELOG.md` section and the version bump. Current version is pre-1.0 (`0.x.y`), where semver allows more flexibility — this repo's convention while pre-1.0:
+
+| Type | Meaning | CHANGELOG section | Version bump |
+|---|---|---|---|
+| `feat` | New capability (a route, a middleware, a config option) | `Added` | minor (`0.X.0`) |
+| `fix` | Bug fix, behavior now matches what was intended | `Fixed` | patch (`0.x.X`) |
+| `breaking` | Changes or removes existing behavior/API a consumer could depend on | `Changed` / `Removed` | minor (`0.X.0`) — once past 1.0.0, this becomes a major bump instead |
+| `chore` / `refactor` / `docs` / `test` | No externally observable behavior change | none required | none |
+
+Bump the version in **every workspace `package.json` together** (root, `apps/api`, `packages/core`, `packages/db`) — they move in lockstep in this repo, there's no independent per-package release process (no Changesets or similar; not needed while nothing here is published to npm — add that tooling only if that changes). Add the new version's entry at the top of `CHANGELOG.md`, following the existing `[0.1.0]` entry's format (dated, grouped by `Added`/`Fixed`/`Changed`/etc.).
