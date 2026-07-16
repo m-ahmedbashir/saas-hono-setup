@@ -1,6 +1,8 @@
 {
-  "name": "my-mindleague-saas",
+  "name": "saas-hono-setup",
+  "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@10.30.3",
   "engines": {
     "node": ">=22"

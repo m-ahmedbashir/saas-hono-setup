@@ -1,5 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { auth, type statement } from "@repo/core/auth";
+import { AppError } from "@repo/core";
 
 type PermissionCheck = Partial<{ [K in keyof typeof statement]: (typeof statement)[K][number][] }>;
 
@@ -15,7 +16,7 @@ export const requirePermission = (permissions: PermissionCheck) =>
     const userContext = c.get("userContext");
 
     if (!userContext) {
-      return c.json({ error: "requirePermission used without injectUserContext running first" }, 500);
+      throw new AppError("INTERNAL_ERROR", "requirePermission used without injectUserContext running first");
     }
 
     if (userContext.mode === "B2B2C") {
@@ -28,7 +29,7 @@ export const requirePermission = (permissions: PermissionCheck) =>
       });
 
       if (!result.success) {
-        return c.json({ error: "Insufficient permissions" }, 403);
+        throw new AppError("FORBIDDEN", "Insufficient permissions");
       }
     }
 
