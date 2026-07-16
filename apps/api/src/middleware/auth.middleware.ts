@@ -1,5 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { auth } from "@repo/core/auth";
+import { AppError } from "@repo/core";
 
 type UserContext =
   | { mode: "B2B2C"; user: typeof auth.$Infer.Session.user; organizationId: string; roles: string[] }
@@ -15,7 +16,7 @@ export const injectUserContext = createMiddleware(async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
   if (!session) {
-    return c.json({ error: "Unauthenticated User Session" }, 401);
+    throw new AppError("UNAUTHENTICATED", "Unauthenticated user session");
   }
 
   const activeOrg = await auth.api.getFullOrganization({ headers: c.req.raw.headers });
