@@ -39,10 +39,10 @@ afterAll(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-function attemptConnection(targetUserId: string): Promise<{ status?: number; ws?: WebSocket }> {
+function attemptConnection(targetUserId: string, origin: string = ORIGIN): Promise<{ status?: number; ws?: WebSocket }> {
   return new Promise((resolve) => {
     const ws = new WebSocket(`ws://localhost:${PORT}/ws/${targetUserId}`, {
-      headers: { Cookie: sessionCookie, Origin: ORIGIN },
+      headers: { Cookie: sessionCookie, Origin: origin },
     });
     ws.on("open", () => resolve({ ws }));
     ws.on("unexpected-response", (_req, res) => resolve({ status: res.statusCode }));
@@ -50,6 +50,13 @@ function attemptConnection(targetUserId: string): Promise<{ status?: number; ws?
 }
 
 describe("WS auth guardrail on /ws/:userId", () => {
+  it("rejects a connection from a disallowed origin, even with a valid session and matching :userId", async () => {
+    const { status, ws } = await attemptConnection(userId, "https://attacker.example");
+
+    expect(status).toBe(403);
+    ws?.close();
+  });
+
   it("rejects a connection whose session does not match the requested :userId", async () => {
     const { status, ws } = await attemptConnection("some-unrelated-user-id");
 

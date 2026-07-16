@@ -11,9 +11,8 @@ import { etag } from "hono/etag";
 import { AppError } from "@repo/core";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { createNotificationsRoutes } from "./modules/notifications/notifications.routes";
+import { allowedOrigins } from "./lib/allowed-origins";
 import { failure, isDev } from "./lib/response";
-
-const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000").split(",");
 
 export const app = new Hono()
   .use("*", logger())
