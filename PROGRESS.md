@@ -22,13 +22,17 @@ Point-in-time status of what's actually built and verified in this repo. This is
 - `betterAuth()` had no `trustedOrigins`, so it rejected requests from origins the Hono CORS middleware was already allowing — two separate checks. `trustedOrigins` now reads the same `ALLOWED_ORIGINS` env var as the CORS middleware, so they can't drift apart.
 - `NODE_ENV=<mode>` lines inside `.env.*` files were dead weight once `cross-env` was introduced (`cross-env` sets it before `--env-file` would even load, and `--env-file` never overrides an already-set var) — removed, including deleting the then-empty `.env.production`.
 
+## Removed — deliberately deferred, not lost
+
+`packages/core/src/algorithms/` (BKT scoring stub) and `packages/core/src/ai/*` (agent types, Claude client, an `exercise-generator` agent, registry) were built early, then deleted. Decision: the SaaS foundation (auth, permissions, response contract) should be product-agnostic and reusable first; product-specific logic (AI agents, education-specific algorithms) comes later, designed against real requirements instead of speculatively. Also removed: the `@anthropic-ai/sdk` dependency from `packages/core/package.json` (nothing used it anymore) and the `"./ai"` export from that package's `exports` map. `packages/core/src/index.ts` no longer re-exports either. Confirmed via `pnpm install` + typecheck across all packages after removal — nothing else referenced them.
+
+If/when this comes back: don't recreate the old structure from memory — redesign it against whatever the actual product requirement is at that point. The old `AIAgent<TInput, TOutput>` contract + registry pattern is a reasonable starting reference but isn't gospel.
+
 ## Scaffolded but not wired to anything yet
 
 Do not build on these without checking they still make sense first — see [AGENTS.md](./AGENTS.md)'s "don't scaffold ahead of the task" rule.
 
-- `packages/core/src/algorithms/bkt-scoring.ts` — Bayesian Knowledge Tracing stub, has a unit test, not called from anywhere.
-- `packages/core/src/ai/*` — agent types, a Claude client, an `exercise-generator` agent, and a registry. Not called from any route. `ANTHROPIC_API_KEY` is not in `.env.development`. No `/api/ai/run` dispatcher route exists yet.
-- `apps/api/src/modules/student-progress/` — directory exists, empty. Would be the first real consumer of `injectUserContext`, `requirePermission`, and the response envelope together.
+- `apps/api/src/modules/student-progress/` — directory exists, empty. Would be the first real consumer of `injectUserContext`, `requirePermission`, and the response envelope together. (Note: "student-progress" itself is product-specific naming left over from the original MindLeague concept — worth reconsidering the name, not just the contents, given the SaaS-foundation-first decision above.)
 - "Partner" as a distinct domain entity (separate from Better Auth's generic `organization`) — discussed, not built. Decision: `organization` stays the auth/tenancy primitive; a future `partners` table in `@repo/db` would FK to `organization.id` and hold actual business fields.
 - Platform-level admin role (the SaaS owner, distinct from any org's admin) — discussed, not built. Would need Better Auth's `admin` plugin added alongside `organization`.
 
