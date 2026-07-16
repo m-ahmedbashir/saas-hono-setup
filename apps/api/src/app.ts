@@ -1,4 +1,5 @@
 import { createNodeWebSocket } from "@hono/node-ws";
+import * as Sentry from "@sentry/hono/node";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -60,6 +61,7 @@ app.onError((err, c) => {
   }
 
   console.error(err);
+  Sentry.captureException(err);
   return failure(c, "INTERNAL_ERROR", "Something went wrong", 500, isDev() ? { message: err.message, stack: err.stack } : undefined);
 });
 

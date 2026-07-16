@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { serve, type ServerType } from "@hono/node-server";
 import WebSocket from "ws";
-import { eq } from "drizzle-orm";
-import { db, user as userTable } from "@repo/db";
+import { db, eq, user as userTable } from "@repo/db";
 import { app, injectWebSocket } from "../../app";
 import { notificationDispatcher } from "./websocket-dispatcher";
 

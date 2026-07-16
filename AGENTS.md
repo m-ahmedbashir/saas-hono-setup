@@ -62,6 +62,7 @@ Product-specific domain modules (algorithms, AI agent strategies, etc.) aren't s
 Rules that follow from this layout:
 - `packages/core` must never import from `apps/api` or from Hono. It should be usable from a script, a test, or a future non-HTTP entrypoint without modification.
 - `packages/db` is the only place table shapes are defined. Don't hand-write TypeScript interfaces that duplicate a Drizzle table or a Zod schema elsewhere — infer with `typeof table.$inferSelect` / `z.infer<typeof schema>`.
+- Import Drizzle query operators (`eq`, `and`, etc.) from `@repo/db`'s re-export, not directly from `drizzle-orm` in `apps/api`. A package that depends on `drizzle-orm` directly can silently resolve a *different* pnpm-isolated instance of it than `@repo/db`'s (e.g. when another dependency pulls in `@opentelemetry/api`, which `drizzle-orm` has as an optional peer) — same version number, incompatible types. If `@repo/db` doesn't re-export an operator you need, add it there rather than importing `drizzle-orm` directly elsewhere.
 - A new feature slice in `apps/api/src/modules/<feature>/` gets its own `.routes.ts` (Hono router), `.db.ts` (queries, using `@repo/db`), and `.schema.ts` (Zod request/response validation). Don't put query logic directly in a route handler.
 
 ## Type safety (non-negotiable, not just a preference)
@@ -114,6 +115,7 @@ Every response from `apps/api`'s own routes — not `/health` (an infra/ops endp
 - Failure: never hand-construct an error response. Either call `failure(c, code, message, status, details?)` directly, or — preferred, since it's the same thing but centralized — `throw new AppError(code, message, details?)` from `@repo/core` and let the global `app.onError()` handler in `apps/api/src/app.ts` format it. `AppError`'s `code` is one of the `ErrorCode` union in `packages/core/src/errors.ts` (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `INTERNAL_ERROR`) — add a new code there, not a bespoke string, if an existing one doesn't fit.
 - `details` on an error is only ever included when `isDev()` is true (`NODE_ENV !== "production"`). Never put anything in `message` that's unsafe to show in production (that's what `details` is for); `message` always ships regardless of environment.
 - Unexpected (non-`AppError`) exceptions still get caught by `app.onError` and shaped into the same envelope with `code: "INTERNAL_ERROR"` — a route handler should never need its own try/catch just to keep the response shape consistent.
+- That same `INTERNAL_ERROR` branch in `app.onError` also calls `Sentry.captureException(err)` (`apps/api/src/instrument.ts` initializes Sentry, gated behind the optional `SENTRY_DSN` env var — a no-op if unset). Only genuinely unexpected errors get reported this way; `AppError`/`HTTPException` are expected/handled cases and aren't sent to Sentry. Don't scatter `Sentry.captureException` calls elsewhere — this one centralized call is the single reporting point, same principle as the response envelope itself.
 
 ## Testing
 
