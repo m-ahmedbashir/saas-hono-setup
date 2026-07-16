@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(pnpm exec *)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(pnpm --filter @repo/db --filter @repo/core --filter @repo/api typecheck)",
+      "Bash(node -e \"console.log\\(require.resolve\\('ws'\\)\\)\")",
+      "Bash(node -e \"console.log\\(typeof WebSocket\\); console.log\\(WebSocket.toString\\(\\).slice\\(0, 200\\)\\)\")"
     ]
   }
 }
