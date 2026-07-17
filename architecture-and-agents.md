@@ -9,8 +9,9 @@ This document provides the complete, production-grade technical blueprint for th
 We do not build monolithic, tangled servers. We use a **Modular Monorepo** powered by **Turborepo** and **pnpm** to separate our code into deployable applications (`apps/`) and highly optimized, internal shared packages (`packages/`).
 
 ### The Architectural Pillars:
+
 1. **Compile-Time End-to-End Type Safety (RPC):** We abandon manual API fetching clients. Hono compiles our routing structure and exports it as a TypeScript type (`AppType`). Our Next.js and Expo frontend applications import this single type, turning network requests into fully autocompleted, type-safe functions.
-2. **Single Source of Truth (DRY Schema):** We never write manual TypeScript interfaces alongside our database tables or validation layers. Our **Zod Schemas** and **Drizzle Schemas** *are* the absolute types. We use TypeScript's native type inference (`z.infer<typeof Schema>` and `typeof table.$inferSelect`) to eliminate type sync drift.
+2. **Single Source of Truth (DRY Schema):** We never write manual TypeScript interfaces alongside our database tables or validation layers. Our **Zod Schemas** and **Drizzle Schemas** _are_ the absolute types. We use TypeScript's native type inference (`z.infer<typeof Schema>` and `typeof table.$inferSelect`) to eliminate type sync drift.
 3. **Decoupled Business Logic (Hexagonal Pattern):** Our database adapters and external API integrations are treated as infrastructure. The core mathematical algorithms (like Bayesian Knowledge Tracing) and AI agent definitions live in `@repo/core` with zero physical dependencies on Hono, network sockets, or SQL clients.
 
 ---
@@ -86,19 +87,20 @@ my-mindleague-saas/
 To support individual players, business clients, and corporate-sponsored players through a single doorway, we utilize **Better Auth** with the native **Organization Plugin** integrated straight into our Hono API.
 
 ### The Identity State Resolution Flow
+
 When a user authenticates, our Hono middleware evaluates their relationship boundaries at runtime to securely scope the application behavior:
 
 ```typescript
 // apps/api/src/middleware/auth.middleware.ts
-import { createMiddleware } from 'hono/factory';
-import { auth } from '@repo/core/auth';
+import { createMiddleware } from "hono/factory";
+import { auth } from "@repo/core/auth";
 
 export const injectUserContext = createMiddleware(async (c, next) => {
   // 1. Decrypt cookie and query session matching in PostgreSQL
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  
+
   if (!session) {
-    return c.json({ error: 'Unauthenticated User Session' }, 401);
+    return c.json({ error: "Unauthenticated User Session" }, 401);
   }
 
   // 2. Fetch any active tenant organization membership linked to the session
@@ -107,19 +109,19 @@ export const injectUserContext = createMiddleware(async (c, next) => {
   // 3. Resolve the hybrid business identity context
   if (activeOrg) {
     // 🏢 B2B / B2B2C Profile Mode (Clubs, Academies, Teams)
-    c.set('userContext', {
-      mode: 'B2B2C',
+    c.set("userContext", {
+      mode: "B2B2C",
       user: session.user,
       organizationId: activeOrg.id,
-      roles: activeOrg.roles // Pulls granular organization permissions
+      roles: activeOrg.roles, // Pulls granular organization permissions
     });
   } else {
     // 🚀 Standard B2C Profile Mode (Individual Consumers)
-    c.set('userContext', {
-      mode: 'B2C',
+    c.set("userContext", {
+      mode: "B2C",
       user: session.user,
       organizationId: null,
-      roles: ['consumer:basic']
+      roles: ["consumer:basic"],
     });
   }
 
@@ -150,8 +152,8 @@ export async function getStudentProfileSummary(userId: string) {
     .where(eq(users.id, userId))
     .limit(1);
 
-  return result[0]; 
-  // TypeScript automatically types the returned object exactly as: 
+  return result[0];
+  // TypeScript automatically types the returned object exactly as:
   // { displayName: string; contactEmail: string; }
 }
 ```
@@ -191,7 +193,7 @@ export const GeneratorOutputSchema = z.object({
   exerciseId: z.string(),
   questionText: z.string(),
   hints: z.array(z.string()),
-  referenceAnswer: z.string()
+  referenceAnswer: z.string(),
 });
 
 export const exerciseGenerator = {
@@ -200,12 +202,12 @@ export const exerciseGenerator = {
   modelTier: "math",
   inputSchema: GeneratorInputSchema,
   outputSchema: GeneratorOutputSchema,
-  
+
   generateSystemPrompt(input) {
     return `You are a cognitive math educator.
 Generate an exercise on the topic of: ${input.topic}.
 Ensure the challenge level matches: ${input.difficulty}.
 Output your response strictly matching the required JSON schema.`;
-  }
+  },
 } satisfies AIAgent<typeof GeneratorInputSchema, typeof GeneratorOutputSchema>;
 ```

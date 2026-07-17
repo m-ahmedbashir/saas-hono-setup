@@ -1,12 +1,19 @@
 import { AppError, type BillingEvent } from "@repo/core";
 import { billingService } from "./stripe-billing.service";
-import { ensureBillingRow, updateBillingByOrgId, updateBillingBySubscriptionId } from "./billing.db";
+import {
+  ensureBillingRow,
+  updateBillingByOrgId,
+  updateBillingBySubscriptionId,
+} from "./billing.db";
 
 /**
  * Full webhook flow: verify signature, parse into a normalized event, react to it. The
  * route only reads the request (header + raw body) and calls this once — see AGENTS.md.
  */
-export async function processWebhook(payload: string, signature: string | undefined): Promise<void> {
+export async function processWebhook(
+  payload: string,
+  signature: string | undefined,
+): Promise<void> {
   if (!signature) {
     throw new AppError("VALIDATION_ERROR", "Missing Stripe webhook signature");
   }

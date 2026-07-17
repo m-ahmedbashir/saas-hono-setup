@@ -11,7 +11,10 @@ export async function ensureBillingRow(organizationId: string) {
   const existing = await getBillingByOrgId(organizationId);
   if (existing) return existing;
 
-  const [created] = await db.insert(billing).values({ id: crypto.randomUUID(), organizationId }).returning();
+  const [created] = await db
+    .insert(billing)
+    .values({ id: crypto.randomUUID(), organizationId })
+    .returning();
   return created!;
 }
 
@@ -27,6 +30,12 @@ export async function updateBillingByOrgId(organizationId: string, values: Parti
   await db.update(billing).set(values).where(eq(billing.organizationId, organizationId));
 }
 
-export async function updateBillingBySubscriptionId(providerSubscriptionId: string, values: Partial<BillingUpdate>) {
-  await db.update(billing).set(values).where(eq(billing.providerSubscriptionId, providerSubscriptionId));
+export async function updateBillingBySubscriptionId(
+  providerSubscriptionId: string,
+  values: Partial<BillingUpdate>,
+) {
+  await db
+    .update(billing)
+    .set(values)
+    .where(eq(billing.providerSubscriptionId, providerSubscriptionId));
 }

@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { serve, type ServerType } from "@hono/node-server";
 import { createHmac } from "node:crypto";
-import { db, eq, organization as organizationTable, user as userTable, billing as billingTable } from "@repo/db";
+import {
+  db,
+  eq,
+  organization as organizationTable,
+  user as userTable,
+  billing as billingTable,
+} from "@repo/db";
 import { auth } from "@repo/core/auth";
 import { app } from "../../app";
 
@@ -129,7 +135,7 @@ describe("POST /billing/checkout", () => {
       const body = (await res.json()) as { success: boolean; data?: { checkoutUrl: string } };
       expect(res.status).toBe(200);
       expect(body.data?.checkoutUrl).toMatch(/^https:\/\/checkout\.stripe\.com\//);
-    }
+    },
   );
 });
 
@@ -146,7 +152,10 @@ describe("POST /billing/webhook", () => {
   it("rejects a request with an invalid signature", async () => {
     const res = await fetch(`http://localhost:${PORT}/billing/webhook`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "stripe-signature": "t=1,v1=not-a-real-signature" },
+      headers: {
+        "Content-Type": "application/json",
+        "stripe-signature": "t=1,v1=not-a-real-signature",
+      },
       body: JSON.stringify({ type: "product.created" }),
     });
     expect(res.status).toBe(422);
@@ -161,7 +170,10 @@ describe("POST /billing/webhook", () => {
     });
     const res = await fetch(`http://localhost:${PORT}/billing/webhook`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "stripe-signature": signWebhookPayload(payload) },
+      headers: {
+        "Content-Type": "application/json",
+        "stripe-signature": signWebhookPayload(payload),
+      },
       body: payload,
     });
     expect(res.status).toBe(200);
@@ -186,12 +198,18 @@ describe("POST /billing/webhook", () => {
     });
     const res = await fetch(`http://localhost:${PORT}/billing/webhook`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "stripe-signature": signWebhookPayload(payload) },
+      headers: {
+        "Content-Type": "application/json",
+        "stripe-signature": signWebhookPayload(payload),
+      },
       body: payload,
     });
     expect(res.status).toBe(200);
 
-    const [row] = await db.select().from(billingTable).where(eq(billingTable.organizationId, orgId));
+    const [row] = await db
+      .select()
+      .from(billingTable)
+      .where(eq(billingTable.organizationId, orgId));
     expect(row?.plan).toBe("starter");
     expect(row?.providerCustomerId).toBe("cus_test_fake");
     expect(row?.providerSubscriptionId).toBe("sub_test_fake");

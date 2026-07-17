@@ -13,7 +13,10 @@ export const enforceSeatLimit = createMiddleware(async (c, next) => {
   const userContext = c.get("userContext");
 
   if (!userContext) {
-    throw new AppError("INTERNAL_ERROR", "enforceSeatLimit used without injectUserContext running first");
+    throw new AppError(
+      "INTERNAL_ERROR",
+      "enforceSeatLimit used without injectUserContext running first",
+    );
   }
 
   if (userContext.mode !== "B2B2C") {
@@ -31,7 +34,10 @@ export const enforceSeatLimit = createMiddleware(async (c, next) => {
     .where(eq(member.organizationId, userContext.organizationId));
 
   if ((row?.activeMembers ?? 0) >= seatLimit) {
-    throw new AppError("PAYMENT_REQUIRED", `Seat limit reached for the "${planId}" plan (${seatLimit} seats)`);
+    throw new AppError(
+      "PAYMENT_REQUIRED",
+      `Seat limit reached for the "${planId}" plan (${seatLimit} seats)`,
+    );
   }
 
   await next();

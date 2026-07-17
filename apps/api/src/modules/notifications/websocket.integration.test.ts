@@ -39,7 +39,10 @@ afterAll(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-function attemptConnection(targetUserId: string, origin: string = ORIGIN): Promise<{ status?: number; ws?: WebSocket }> {
+function attemptConnection(
+  targetUserId: string,
+  origin: string = ORIGIN,
+): Promise<{ status?: number; ws?: WebSocket }> {
   return new Promise((resolve) => {
     const ws = new WebSocket(`ws://localhost:${PORT}/ws/${targetUserId}`, {
       headers: { Cookie: sessionCookie, Origin: origin },
@@ -74,7 +77,10 @@ describe("WS auth guardrail on /ws/:userId", () => {
       ws!.once("message", (data) => resolve(JSON.parse(data.toString())));
     });
 
-    await notificationDispatcher.send(userId, { title: "Success!", body: "Your process is complete." });
+    await notificationDispatcher.send(userId, {
+      title: "Success!",
+      body: "Your process is complete.",
+    });
 
     await expect(messageReceived).resolves.toEqual({
       title: "Success!",
