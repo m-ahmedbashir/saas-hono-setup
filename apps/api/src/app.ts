@@ -1,4 +1,5 @@
 import { createNodeWebSocket } from "@hono/node-ws";
+import * as Sentry from "@sentry/hono/node";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -10,9 +11,8 @@ import { etag } from "hono/etag";
 import { AppError } from "@repo/core";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { createNotificationsRoutes } from "./modules/notifications/notifications.routes";
+import { allowedOrigins } from "./lib/allowed-origins";
 import { failure, isDev } from "./lib/response";
-
-const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000").split(",");
 
 export const app = new Hono()
   .use("*", logger())
@@ -60,6 +60,7 @@ app.onError((err, c) => {
   }
 
   console.error(err);
+  Sentry.captureException(err);
   return failure(c, "INTERNAL_ERROR", "Something went wrong", 500, isDev() ? { message: err.message, stack: err.stack } : undefined);
 });
 
