@@ -136,16 +136,27 @@ Every route in `apps/api` (except `/health` and the `/api/auth/**` proxy, which 
 
 Run from the repo root (fans out via Turborepo) or scoped with `--filter @repo/api`:
 
-| Script             | What it does                                              |
-| ------------------ | --------------------------------------------------------- |
-| `pnpm dev`         | Start `apps/api` in watch mode                            |
-| `pnpm build`       | Compile all packages                                      |
-| `pnpm test`        | Run tests                                                 |
-| `pnpm typecheck`   | `tsc --noEmit` across the monorepo                        |
-| `pnpm db:generate` | Generate a SQL migration from `packages/db/src/schema.ts` |
-| `pnpm db:migrate`  | Apply pending migrations to `DATABASE_URL`                |
+| Script              | What it does                                              |
+| ------------------- | --------------------------------------------------------- |
+| `pnpm dev`          | Start `apps/api` in watch mode                            |
+| `pnpm build`        | Compile all packages                                      |
+| `pnpm test`         | Run tests                                                 |
+| `pnpm typecheck`    | `tsc --noEmit` across the monorepo                        |
+| `pnpm lint`         | Run ESLint across all workspaces                          |
+| `pnpm lint:fix`     | Run ESLint with `--fix`                                   |
+| `pnpm format`       | Format all files with Prettier                            |
+| `pnpm format:check` | Check that all files are formatted                        |
+| `pnpm db:generate`  | Generate a SQL migration from `packages/db/src/schema.ts` |
+| `pnpm db:migrate`   | Apply pending migrations to `DATABASE_URL`                |
 
-## Adding a new feature
+## CI
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every PR and push to `main`:
+
+1. **Quality gate** — `format:check`, `lint`, `typecheck`, `build`.
+2. **Test gate** — spins up a Postgres service, runs migrations, then runs `pnpm test`.
+
+To make CI pass, add a repository secret named `BETTER_AUTH_SECRET` (generate with `npx auth secret`). Stripe keys are not required for CI — the billing tests skip live Stripe calls when those keys are absent.
 
 The `apps/api/src/modules/billing/` slice is the reference example — read it alongside this. A new feature (say, `widgets`) gets its own slice under `apps/api/src/modules/widgets/`:
 
