@@ -4,6 +4,7 @@ import {
   text,
   timestamp,
   boolean,
+  integer,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -134,6 +135,44 @@ export const invitation = pgTable(
     index("invitation_email_idx").on(table.email),
   ]
 );
+
+// Not a Better Auth-generated table (unlike the ones above) — hand-written and
+// migrated normally via drizzle-kit. FK'd to `organization.id` rather than adding
+// columns to `organization` itself, since that table IS generated and would drift
+// on the next `@better-auth/cli generate` run. See AGENTS.md's billing section.
+export const billing = pgTable(
+  "billing",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .unique()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    // Matches @repo/core's PlanId ("free" | "starter" | "growth"). Kept as free text,
+    // not a DB enum, since packages/db can't import from packages/core (would create
+    // a circular workspace dependency) — validated at the app boundary instead, same
+    // trust model as `member.role` above.
+    plan: text("plan").notNull().default("free"),
+    providerCustomerId: text("provider_customer_id"),
+    providerSubscriptionId: text("provider_subscription_id"),
+    // Matches @repo/core's SubscriptionStatus ("active" | "past_due" | "canceled" | "incomplete").
+    subscriptionStatus: text("subscription_status"),
+    seatQuantity: integer("seat_quantity"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("billing_organizationId_idx").on(table.organizationId)]
+);
+
+export const billingRelations = relations(billing, ({ one }) => ({
+  organization: one(organization, {
+    fields: [billing.organizationId],
+    references: [organization.id],
+  }),
+}));
 
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
