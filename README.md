@@ -69,6 +69,7 @@ See `.env.example` for the full list with comments. Summary:
 | `BETTER_AUTH_URL` | Base URL this API is served from |
 | `PORT` | Port `apps/api` listens on |
 | `ALLOWED_ORIGINS` | Comma-separated origins allowed to call this API — drives both the Hono CORS middleware and Better Auth's own origin check |
+| `SENTRY_DSN` | Optional. Sentry DSN for production error monitoring. Unset = Sentry is disabled entirely, no-op |
 
 `.env.development` / `.env.test` are gitignored — they're for your local machine only. `NODE_ENV` itself is **not** set in any env file; each `apps/api` script sets it directly (`dev` → `development`, `start` → `production`, `test` → `test`) via `cross-env`, so it's always correct regardless of which command runs. Real production secrets should come from your hosting platform's env var injection at deploy time, never from a committed file.
 

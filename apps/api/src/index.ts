@@ -1,3 +1,5 @@
+import "./instrument";
+
 import { serve } from "@hono/node-server";
 import { app, injectWebSocket } from "./app";
 
