@@ -53,6 +53,7 @@ packages/core/              environment-agnostic logic — no Hono/HTTP/socket i
   src/auth/                  Better Auth config + access control
   src/errors.ts              AppError + error codes — domain-level, not Hono-specific
   src/notifications/types.ts NotificationDispatcher interface + NotificationPayload — contract only, no socket import
+  src/billing/types.ts       BillingGateway interface + PlanConfig/BillingEvent — contract only, no payment SDK import
 ```
 
 `apps/api/src/modules/notifications/websocket-dispatcher.ts` is the concrete implementation of that interface — the reference example for the DIP pattern below: the *interface* lives in `packages/core` (pure contract, generic `TClient` so core never needs to know what a "client" concretely is), the *implementation* that actually touches a transport-layer object (a Hono `WSContext` wrapping a raw socket) lives in `apps/api`. Follow this split for any future interface/adapter pair — don't put the concrete, transport-touching class in `packages/core` just because its interface lives there.
@@ -88,6 +89,17 @@ Better Auth + the Organization plugin is the single identity system for B2C (ind
 - WebSocket routes are not covered by the CORS middleware — CORS only applies to `fetch`, and a WS handshake still carries cookies cross-site regardless of origin. Any future WS route needs its own explicit `Origin` check against `apps/api/src/lib/allowed-origins.ts`'s `allowedOrigins` (the same list the CORS middleware uses), the way `notifications.routes.ts` does — don't rely on the session cookie's `SameSite` default to prevent cross-site WebSocket hijacking, since that's a client-side behavior this repo may need to relax (`SameSite=None`) once frontend and API are on separate domains.
 - Auth routes themselves are unauthenticated by definition — `apps/api/src/modules/auth/auth.routes.ts` just proxies to `auth.handler`. Don't add `injectUserContext` to that router.
 
+## Billing model
+
+`BillingGateway` (`packages/core/src/billing/types.ts`) is a vendor-agnostic contract — `createCheckoutSession`, `updateSubscriptionQuantity`, `cancelSubscription`, `parseWebhookEvent`. `StripeBillingService` (`apps/api/src/modules/billing/stripe-billing.service.ts`) is the concrete Stripe adapter, the same interface-in-core / implementation-in-apps/api split as `NotificationDispatcher`.
+
+- **No file outside `stripe-billing.service.ts` may import the `stripe` package.** That includes types — `Stripe.Event`, `Stripe.Checkout.Session`, etc. never appear in a route or middleware signature. The webhook route calls `billingService.parseWebhookEvent(payload, signature)` and switches on the *normalized* `BillingEvent` union, not Stripe's raw event `type` strings — this is what actually makes "swap Stripe for another vendor" require zero route changes; without it, the webhook route would need the vendor SDK just to read event payloads.
+- Billing data lives in its own `billing` table (`packages/db/src/schema.ts`), FK'd to `organization.id` — **not** columns added to `organization` itself, since `organization` is Better-Auth-generated and would drift on the next `@better-auth/cli generate`. Same reasoning as the deferred `partners` table idea in [PROGRESS.md](./PROGRESS.md).
+- `plans` (`packages/core/src/billing/types.ts`) is an example tier map (`free`/`starter`/`growth`) a real product replaces wholesale — don't treat the specific tiers/limits as meaningful, only the shape.
+- `enforceSeatLimit` (`apps/api/src/middleware/seat-limit.middleware.ts`) throws `AppError("PAYMENT_REQUIRED", ...)` once active member count reaches the org's plan `seatLimit`. B2C passes through (no org, nothing to enforce), same pattern as `requirePermission`.
+- `/billing/checkout` requires `requirePermission({ billing: ["manage"] })` — only `owner`/`admin` can start a checkout for the org, not any member. `/billing/webhook` is unauthenticated by definition (Stripe calls it directly) and is verified by signature instead, via `parseWebhookEvent`.
+- `/billing/webhook`'s response isn't wrapped in the `success`/`failure` envelope — Stripe only checks HTTP status, never body shape, same reasoning as the `/health` and `/api/auth/**` exclusions below.
+
 ### Auth-related tables are generated, never hand-edited
 
 `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation` in `packages/db/src/schema.ts` were not written by hand — they came from Better Auth's own CLI, which reads `packages/core/src/auth/index.ts` and emits exactly the tables/columns the enabled plugins require. Whenever a Better Auth plugin is added, removed, or reconfigured, the fix is to regenerate, not guess at the new shape by hand:
@@ -110,10 +122,10 @@ Then diff the output against `packages/db/src/schema.ts`, merge in whatever chan
 
 ## API response shape
 
-Every response from `apps/api`'s own routes — not `/health` (an infra/ops endpoint) and **not** `/api/auth/**` (Better Auth's own client SDK expects its native shape; wrapping it would break that SDK) — uses one envelope, via `apps/api/src/lib/response.ts`:
+Every response from `apps/api`'s own routes — not `/health` (an infra/ops endpoint), not `/api/auth/**` (Better Auth's own client SDK expects its native shape; wrapping it would break that SDK), and not `/billing/webhook` (Stripe only checks HTTP status, never body shape) — uses one envelope, via `apps/api/src/lib/response.ts`:
 
 - Success: `success(c, data)` → `{ success: true, data }`.
-- Failure: never hand-construct an error response. Either call `failure(c, code, message, status, details?)` directly, or — preferred, since it's the same thing but centralized — `throw new AppError(code, message, details?)` from `@repo/core` and let the global `app.onError()` handler in `apps/api/src/app.ts` format it. `AppError`'s `code` is one of the `ErrorCode` union in `packages/core/src/errors.ts` (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `INTERNAL_ERROR`) — add a new code there, not a bespoke string, if an existing one doesn't fit.
+- Failure: never hand-construct an error response. Either call `failure(c, code, message, status, details?)` directly, or — preferred, since it's the same thing but centralized — `throw new AppError(code, message, details?)` from `@repo/core` and let the global `app.onError()` handler in `apps/api/src/app.ts` format it. `AppError`'s `code` is one of the `ErrorCode` union in `packages/core/src/errors.ts` (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `PAYLOAD_TOO_LARGE`, `PAYMENT_REQUIRED`, `INTERNAL_ERROR`) — add a new code there, not a bespoke string, if an existing one doesn't fit.
 - `details` on an error is only ever included when `isDev()` is true (`NODE_ENV !== "production"`). Never put anything in `message` that's unsafe to show in production (that's what `details` is for); `message` always ships regardless of environment.
 - Unexpected (non-`AppError`) exceptions still get caught by `app.onError` and shaped into the same envelope with `code: "INTERNAL_ERROR"` — a route handler should never need its own try/catch just to keep the response shape consistent.
 - That same `INTERNAL_ERROR` branch in `app.onError` also calls `Sentry.captureException(err)` (`apps/api/src/instrument.ts` initializes Sentry, gated behind the optional `SENTRY_DSN` env var — a no-op if unset). Only genuinely unexpected errors get reported this way; `AppError`/`HTTPException` are expected/handled cases and aren't sent to Sentry. Don't scatter `Sentry.captureException` calls elsewhere — this one centralized call is the single reporting point, same principle as the response envelope itself.
