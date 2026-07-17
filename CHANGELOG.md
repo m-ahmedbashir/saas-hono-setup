@@ -8,9 +8,13 @@ All notable changes to this project are documented here. Format loosely follows 
 - Seat-based Stripe billing: a vendor-agnostic `BillingGateway` contract (`packages/core/src/billing/types.ts`) with a `StripeBillingService` adapter (`apps/api/src/modules/billing/`) — switching payment vendors touches only that one adapter file, never a route. `POST /billing/checkout` (owner/admin only) and `POST /billing/webhook` (signature-verified, normalized before touching the DB), plus `enforceSeatLimit` middleware that blocks org actions once active member count reaches the plan's seat limit. New `billing` table, FK'd to `organization.id`. Verified against the real (test-mode) Stripe API and a real signed webhook round trip — see PROGRESS.md.
 - Permanent integration test for the billing routes (`billing.integration.test.ts`): auth/permission gates, real Stripe checkout call, and webhook signature verification + DB update via a self-signed payload.
 - New `PAYMENT_REQUIRED` (402) error code.
+- `POST /billing/checkout`'s request body is now validated via `@hono/zod-validator`'s `zValidator` as route middleware (a real pre-route guard) instead of a `.safeParse()` call inside the handler — the new standard pattern for any route with a body/query, documented in `AGENTS.md`.
 
 ### Fixed
 - `pnpm db:generate`/`pnpm db:migrate` never actually loaded `DATABASE_URL` (no `--env-file` wired) — silently relied on it already being in the shell's environment. Now loads `.env.development` itself.
+
+### Changed
+- `.routes.ts` files now hold only route registration, named middleware, and a thin handler — no inline orchestration, no inline anonymous guard closures, no more than one real call in a handler body. `billing.routes.ts`'s webhook route used to do signature-check + parse + conditional dispatch inline (three steps); now it's one call to `billing.handlers.ts`'s new `processWebhook`. Its checkout route used to inline a B2B2C mode-check before calling the billing service; now it's `requireOrgContext` (new export from `auth.middleware.ts`) doing that narrowing in one call. `notifications.routes.ts`'s inline origin-check and self-user-id closures moved to new reusable middleware, `apps/api/src/middleware/origin.middleware.ts` (`requireAllowedOrigin`) and `self-param.middleware.ts` (`requireSelfParam`). No behavior change — same 17 tests pass throughout, proving each extracted code path still works. New hard rule in `AGENTS.md`, including the one standing exception (`requireOrgContext`-style type-narrowing calls don't count against the "one call" rule).
 
 ## [0.2.0] — 2026-07-17
 
