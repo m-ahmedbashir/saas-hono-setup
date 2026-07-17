@@ -5,7 +5,7 @@ const planIds = Object.keys(plans) as [keyof typeof plans, ...(keyof typeof plan
 
 export const checkoutRequestSchema = z.object({
   planId: z.enum(planIds),
-  quantity: z.number().int().positive(),
+  quantity: z.number().int().positive().max(1000),
 });
 
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
