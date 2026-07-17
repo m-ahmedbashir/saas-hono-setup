@@ -156,7 +156,7 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every PR and push
 1. **Quality gate** — `format:check`, `lint`, `typecheck`, `build`.
 2. **Test gate** — spins up a Postgres service, runs migrations, then runs `pnpm test`.
 
-To make CI pass, add a repository secret named `BETTER_AUTH_SECRET` (generate with `npx auth secret`). Stripe keys are not required for CI — the billing tests skip live Stripe calls when those keys are absent.
+To make CI pass, add a repository secret named `BETTER_AUTH_SECRET` (generate with `npx auth secret`). The workflow hardcodes a test-only `STRIPE_WEBHOOK_SECRET` so the webhook signature tests can sign their own payloads; live `STRIPE_SECRET_KEY` and Stripe price IDs are not required — the tests that hit Stripe are skipped when those keys are absent.
 
 The `apps/api/src/modules/billing/` slice is the reference example — read it alongside this. A new feature (say, `widgets`) gets its own slice under `apps/api/src/modules/widgets/`:
 
