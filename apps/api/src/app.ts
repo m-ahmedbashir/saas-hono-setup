@@ -10,6 +10,7 @@ import { bodyLimit } from "hono/body-limit";
 import { etag } from "hono/etag";
 import { AppError } from "@repo/core";
 import { authRoutes } from "./modules/auth/auth.routes";
+import { billingRoutes } from "./modules/billing/billing.routes";
 import { createNotificationsRoutes } from "./modules/notifications/notifications.routes";
 import { allowedOrigins } from "./lib/allowed-origins";
 import { failure, isDev } from "./lib/response";
@@ -42,7 +43,8 @@ export const app = new Hono()
   )
   .use("*", etag())
   .get("/health", (c) => c.json({ status: "ok" }))
-  .route("/api/auth", authRoutes);
+  .route("/api/auth", authRoutes)
+  .route("/billing", billingRoutes);
 
 export const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
