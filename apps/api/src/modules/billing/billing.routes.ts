@@ -24,12 +24,19 @@ export const billingRoutes = new Hono()
     requirePermission({ billing: ["manage"] }),
     validateCheckoutBody,
     async (c) => {
-      const userContext = requireOrgContext(c.get("userContext"), "Checkout requires an active organization");
+      const userContext = requireOrgContext(
+        c.get("userContext"),
+        "Checkout requires an active organization",
+      );
       const { planId, quantity } = c.req.valid("json");
-      const { checkoutUrl } = await billingService.createCheckoutSession(userContext.organizationId, planId, quantity);
+      const { checkoutUrl } = await billingService.createCheckoutSession(
+        userContext.organizationId,
+        planId,
+        quantity,
+      );
 
       return success(c, { checkoutUrl });
-    }
+    },
   )
   // Not wrapped in the success/failure envelope — Stripe only checks HTTP status on
   // this endpoint, never the body shape, same reasoning as /health and /api/auth's

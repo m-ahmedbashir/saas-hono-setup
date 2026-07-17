@@ -16,7 +16,10 @@ export const requirePermission = (permissions: PermissionCheck) =>
     const userContext = c.get("userContext");
 
     if (!userContext) {
-      throw new AppError("INTERNAL_ERROR", "requirePermission used without injectUserContext running first");
+      throw new AppError(
+        "INTERNAL_ERROR",
+        "requirePermission used without injectUserContext running first",
+      );
     }
 
     if (userContext.mode === "B2B2C") {

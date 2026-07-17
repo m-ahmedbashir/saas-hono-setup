@@ -2,17 +2,18 @@
 
 Instructions for any AI coding agent working in this repository. Read before touching code. If this conflicts with what you observe in the repo, the repo wins — update this file, don't silently ignore it.
 
-Standing rules — apply to every future file. For what's actually built and verified right now, see [PROGRESS.md](./PROGRESS.md); don't assume something exists just because a rule here describes how it *should* behave.
+Standing rules — apply to every future file. For what's actually built and verified right now, see [PROGRESS.md](./PROGRESS.md); don't assume something exists just because a rule here describes how it _should_ behave.
 
 ## What this is
 
 `saas-hono-setup` — pnpm + Turborepo monorepo. Hono API (`apps/api`) + Postgres/Drizzle (`packages/db`) + environment-agnostic domain logic (`packages/core`, testable without a server). Current focus: a generic multi-tenant SaaS foundation (auth, permissions, response contract, billing) reusable regardless of product. Product-specific logic (AI agents, algorithms) is deliberately deferred — see PROGRESS.md.
 
-[architecture-and-agents.md](./architecture-and-agents.md) explains *why* (data shaping, auth router design). This file governs *how to work here*. PROGRESS.md tracks *what's done*.
+[architecture-and-agents.md](./architecture-and-agents.md) explains _why_ (data shaping, auth router design). This file governs _how to work here_. PROGRESS.md tracks _what's done_.
 
 ## Ground rule: don't scaffold ahead of the task
 
 This repo was previously over-scaffolded in one sitting (algorithms + AI agents built before auth even booted). Don't repeat that:
+
 - Build the feature asked for and the minimum it needs to run — not its neighbors "while we're in there."
 - Check PROGRESS.md's "scaffolded but not wired" list before adding a new module — extend or delete an existing stub, don't leave a second parallel one.
 - Verify what you built actually runs (boot the server, hit the endpoint, run the test) before moving on — typecheck alone doesn't catch a route that compiles but is never invoked.
@@ -24,11 +25,12 @@ This repo was previously over-scaffolded in one sitting (algorithms + AI agents 
 - **Application** (`apps/api`) — delivery layer only: receive request, validate, call Domain/Infrastructure, shape response. No business logic in a route handler.
 
 SOLID at the file level, as you write, not as a retrofit:
+
 - **SRP** — a route file routes, a `.db.ts` file queries. Two reasons-to-change means split the file.
 - **OCP** — a new feature slice is a new file, not an edit to an unrelated one (a registry/barrel needing a one-line addition to register it is the accepted exception).
 - **LSP** — don't bake single-implementation assumptions (one DB driver, one vendor) into code meant to work for any implementation of a contract.
 - **ISP** — routes expose precise, per-route Zod schemas/RPC types, never one monolithic type forcing a client to depend on unused fields.
-- **DIP** — high-level code depends on an interface, not a low-level tool's concrete API directly. Accepted exception: `packages/core/src/auth/index.ts` imports `db` from `@repo/db` for Better Auth's `drizzleAdapter()` — that library's adapter API has no abstraction to invert against. Don't copy this pattern elsewhere without the same justification. A vendor-coupling gap (e.g. hard-coding one AI provider's SDK) is fine to leave alone *only* while nothing calls it yet — fix it when the first real caller shows up, not before.
+- **DIP** — high-level code depends on an interface, not a low-level tool's concrete API directly. Accepted exception: `packages/core/src/auth/index.ts` imports `db` from `@repo/db` for Better Auth's `drizzleAdapter()` — that library's adapter API has no abstraction to invert against. Don't copy this pattern elsewhere without the same justification. A vendor-coupling gap (e.g. hard-coding one AI provider's SDK) is fine to leave alone _only_ while nothing calls it yet — fix it when the first real caller shows up, not before.
 
 ## Structure
 
@@ -52,14 +54,15 @@ packages/core/              environment-agnostic logic — no Hono/HTTP/socket i
   src/billing/types.ts       BillingGateway interface — contract only
 ```
 
-Interface/adapter split: the *interface* lives in `packages/core` (pure contract — e.g. `NotificationDispatcher<TClient>`, generic so core never knows what a "client" concretely is); the *implementation* that touches a real transport/vendor object lives in `apps/api` (e.g. `websocket-dispatcher.ts`, `stripe-billing.service.ts`). Follow this for any future interface/adapter pair.
+Interface/adapter split: the _interface_ lives in `packages/core` (pure contract — e.g. `NotificationDispatcher<TClient>`, generic so core never knows what a "client" concretely is); the _implementation_ that touches a real transport/vendor object lives in `apps/api` (e.g. `websocket-dispatcher.ts`, `stripe-billing.service.ts`). Follow this for any future interface/adapter pair.
 
 Product-specific domain modules (algorithms, AI strategies) aren't scaffolded yet — when built, a new subfolder under `packages/core/src/`, same "pure logic" rule as everything else there. Don't invent the layout before there's a real module.
 
 Rules from this layout:
+
 - `packages/core` never imports from `apps/api` or Hono — must stay usable from a script, a test, or a future non-HTTP entrypoint.
 - `packages/db` is the only place table shapes are defined. Derive types (`typeof table.$inferSelect`), never hand-write a duplicate interface.
-- Import Drizzle operators (`eq`, `count`, etc.) from `@repo/db`'s re-export, not `drizzle-orm` directly in `apps/api` — a direct dependency there can resolve a *different* pnpm-isolated `drizzle-orm` instance (e.g. once another dependency pulls in `@opentelemetry/api`, an optional peer) with incompatible types despite matching versions. Add missing operators to `@repo/db`'s re-export instead.
+- Import Drizzle operators (`eq`, `count`, etc.) from `@repo/db`'s re-export, not `drizzle-orm` directly in `apps/api` — a direct dependency there can resolve a _different_ pnpm-isolated `drizzle-orm` instance (e.g. once another dependency pulls in `@opentelemetry/api`, an optional peer) with incompatible types despite matching versions. Add missing operators to `@repo/db`'s re-export instead.
 - A feature slice gets `.routes.ts` (router), `.db.ts` (queries), `.schema.ts` (Zod). Don't put query logic in a route handler.
 - **A route's real logic never lives in `.routes.ts` — hard rule.** `.routes.ts` is a manifest: every endpoint, its guards, what it calls — not how any of it works. A route registration lists middleware/validators, then a handler that reads input, makes **one call**, and shapes the response. Multiple sequential steps (a `switch` deciding what an input means, several calls in order) is real logic — pull it into `<feature>.service.ts` (called directly) or `<feature>.handlers.ts` (reacting to an event/webhook); same concept, name for the trigger. Reference: `apps/api/src/modules/billing/`.
   - Middleware/validators are a judgment call, not mandatory extraction: reusable → a named file in `apps/api/src/middleware/`; one-off (a `zValidator` bound to one route's schema) → fine inline in `.routes.ts`.
@@ -140,24 +143,25 @@ Two patterns — use the cheaper one whenever it answers the question:
 
 - TypeScript strict mode everywhere, ESM (`"type": "module"`) in every package.
 - Zod v4, not v3 (better-auth's peer dependency forces this repo-wide) — keep all packages on the same major.
-- No comments explaining *what* code does — only *why*, and only when non-obvious.
+- No comments explaining _what_ code does — only _why_, and only when non-obvious.
 
 ## Keeping public-facing docs in sync
 
 `README.md`/`CHANGELOG.md` are read by people outside this conversation and go stale silently — update them in the same change, not a follow-up:
+
 - New/changed/removed env var, script, or setup step → README's relevant section.
-- A convention change to "how to add a feature" → README's Architecture/Adding-a-feature sections *and* the relevant rule here.
+- A convention change to "how to add a feature" → README's Architecture/Adding-a-feature sections _and_ the relevant rule here.
 - Anything a consumer would notice → a CHANGELOG entry. Purely internal changes don't need one.
 
 ### Versioning & changelog
 
 Categorize changes like [Conventional Commits](https://www.conventionalcommits.org/); pre-1.0, this repo's convention:
 
-| Type | Meaning | CHANGELOG section | Version bump |
-|---|---|---|---|
-| `feat` | New capability | `Added` | minor |
-| `fix` | Bug fix | `Fixed` | patch |
-| `breaking` | Changes/removes existing behavior | `Changed`/`Removed` | minor (major once past 1.0.0) |
-| `chore`/`refactor`/`docs`/`test` | No observable behavior change | none | none |
+| Type                             | Meaning                           | CHANGELOG section   | Version bump                  |
+| -------------------------------- | --------------------------------- | ------------------- | ----------------------------- |
+| `feat`                           | New capability                    | `Added`             | minor                         |
+| `fix`                            | Bug fix                           | `Fixed`             | patch                         |
+| `breaking`                       | Changes/removes existing behavior | `Changed`/`Removed` | minor (major once past 1.0.0) |
+| `chore`/`refactor`/`docs`/`test` | No observable behavior change     | none                | none                          |
 
 Bump every workspace `package.json` together (no independent per-package release process). Add the new version's entry at the top of `CHANGELOG.md`.

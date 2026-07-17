@@ -14,7 +14,7 @@ function buildTestApp() {
   const app = new Hono()
     .get("/ok", (c) => success(c, { hello: "world" }))
     .get("/fail", (c) => failure(c, "VALIDATION_ERROR", "bad input", 422, { field: "email" }))
-    .get("/boom", (c): ReturnType<typeof success> => {
+    .get("/boom", (_c): ReturnType<typeof success> => {
       throw new AppError("FORBIDDEN", "nope", { reason: "test" });
     });
 

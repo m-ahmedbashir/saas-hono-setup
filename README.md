@@ -2,22 +2,28 @@
 
 A production-oriented starting point for a multi-tenant SaaS backend: [Hono](https://hono.dev) on the API layer, [Drizzle ORM](https://orm.drizzle.team) on Postgres, and [Better Auth](https://better-auth.com) handling authentication and organizations — wired together in a type-safe pnpm/Turborepo monorepo.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Node.js >=22](https://img.shields.io/badge/node-%3E%3D22-6DA55F?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-10.30.3-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![Hono](https://img.shields.io/badge/Hono-E36002?logo=hono&logoColor=white)](https://hono.dev/)
+
 It is deliberately **product-agnostic**. There's no example CRUD feature baked in on top of the auth layer — this repo is the reusable foundation (auth, permissions, a consistent API response contract, environment handling) you'd fork or build on for an actual product, not a finished app.
 
 ## Why this exists
 
-Most starter templates either skip auth entirely or bolt on something minimal. This one takes the opposite approach: the auth/permission layer is built out properly first — real multi-tenancy (individual users *and* organizations), permission-based access control (not just role checks), a consistent error/response shape, and environment-aware error verbosity — so that whatever you build on top of it doesn't have to relitigate those decisions.
+Most starter templates either skip auth entirely or bolt on something minimal. This one takes the opposite approach: the auth/permission layer is built out properly first — real multi-tenancy (individual users _and_ organizations), permission-based access control (not just role checks), a consistent error/response shape, and environment-aware error verbosity — so that whatever you build on top of it doesn't have to relitigate those decisions.
 
 ## Tech stack
 
-| Layer | Choice | Why |
-|---|---|---|
-| Monorepo | pnpm workspaces + Turborepo | Strict dependency isolation (no phantom deps), cached task pipelines |
-| API | [Hono](https://hono.dev) on Node (`@hono/node-server`) | Fast, web-standard, tiny — and its Zod + RPC integration gives end-to-end type safety to clients for free |
-| Database | Postgres via [Drizzle ORM](https://orm.drizzle.team) | Schema-as-code, SQL-level migrations, no hidden magic |
-| Auth | [Better Auth](https://better-auth.com) | Email/password + an Organization plugin for multi-tenancy (individual, org member, org owner) out of the box |
-| Validation | [Zod](https://zod.dev) v4 | Single source of truth for request/response shapes |
-| Language | TypeScript, strict mode everywhere | |
+| Layer      | Choice                                                 | Why                                                                                                          |
+| ---------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Monorepo   | pnpm workspaces + Turborepo                            | Strict dependency isolation (no phantom deps), cached task pipelines                                         |
+| API        | [Hono](https://hono.dev) on Node (`@hono/node-server`) | Fast, web-standard, tiny — and its Zod + RPC integration gives end-to-end type safety to clients for free    |
+| Database   | Postgres via [Drizzle ORM](https://orm.drizzle.team)   | Schema-as-code, SQL-level migrations, no hidden magic                                                        |
+| Auth       | [Better Auth](https://better-auth.com)                 | Email/password + an Organization plugin for multi-tenancy (individual, org member, org owner) out of the box |
+| Validation | [Zod](https://zod.dev) v4                              | Single source of truth for request/response shapes                                                           |
+| Language   | TypeScript, strict mode everywhere                     |                                                                                                              |
 
 ## Prerequisites
 
@@ -62,18 +68,18 @@ curl -X POST http://localhost:8787/api/auth/sign-up/email \
 
 See `.env.example` for the full list with comments. Summary:
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | Postgres connection string |
-| `BETTER_AUTH_SECRET` | Session/token signing secret — generate with `npx auth secret` |
-| `BETTER_AUTH_URL` | Base URL this API is served from |
-| `PORT` | Port `apps/api` listens on |
-| `ALLOWED_ORIGINS` | Comma-separated origins allowed to call this API — drives both the Hono CORS middleware and Better Auth's own origin check |
-| `SENTRY_DSN` | Optional. Sentry DSN for production error monitoring. Unset = Sentry is disabled entirely, no-op |
-| `STRIPE_SECRET_KEY` | Stripe secret key (test-mode key is fine for development) |
-| `STRIPE_WEBHOOK_SECRET` | Signing secret for `/billing/webhook`, from the Stripe CLI or dashboard |
-| `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_GROWTH` | Stripe Price IDs backing the paid tiers in `packages/core/src/billing/types.ts` |
-| `BILLING_CHECKOUT_RETURN_URL` | Where Stripe Checkout redirects back to after a session completes/cancels |
+| Variable                                       | Purpose                                                                                                                    |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                 | Postgres connection string                                                                                                 |
+| `BETTER_AUTH_SECRET`                           | Session/token signing secret — generate with `npx auth secret`                                                             |
+| `BETTER_AUTH_URL`                              | Base URL this API is served from                                                                                           |
+| `PORT`                                         | Port `apps/api` listens on                                                                                                 |
+| `ALLOWED_ORIGINS`                              | Comma-separated origins allowed to call this API — drives both the Hono CORS middleware and Better Auth's own origin check |
+| `SENTRY_DSN`                                   | Optional. Sentry DSN for production error monitoring. Unset = Sentry is disabled entirely, no-op                           |
+| `STRIPE_SECRET_KEY`                            | Stripe secret key (test-mode key is fine for development)                                                                  |
+| `STRIPE_WEBHOOK_SECRET`                        | Signing secret for `/billing/webhook`, from the Stripe CLI or dashboard                                                    |
+| `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_GROWTH` | Stripe Price IDs backing the paid tiers in `packages/core/src/billing/types.ts`                                            |
+| `BILLING_CHECKOUT_RETURN_URL`                  | Where Stripe Checkout redirects back to after a session completes/cancels                                                  |
 
 `.env.development` / `.env.test` are gitignored — they're for your local machine only. `NODE_ENV` itself is **not** set in any env file; each `apps/api` script sets it directly (`dev` → `development`, `start` → `production`, `test` → `test`) via `cross-env`, so it's always correct regardless of which command runs. Real production secrets should come from your hosting platform's env var injection at deploy time, never from a committed file.
 
@@ -111,7 +117,7 @@ Better Auth's Organization plugin gives three identity shapes for free:
 - **B2B2C member** — a user invited into an organization with a role (`member`, `admin`).
 - **Organization owner** — whoever created the org, auto-assigned the `owner` role.
 
-`injectUserContext` (a Hono middleware) resolves which of these a request is coming from and exposes it as `c.get('userContext')`. `requirePermission(permissions)` gates a route by *permission*, not role: for an org member it checks their role's actual permissions via Better Auth; for a B2C individual it passes through, since an individual's access to their own data is an ownership check at the query level, not a role lookup.
+`injectUserContext` (a Hono middleware) resolves which of these a request is coming from and exposes it as `c.get('userContext')`. `requirePermission(permissions)` gates a route by _permission_, not role: for an org member it checks their role's actual permissions via Better Auth; for a B2C individual it passes through, since an individual's access to their own data is an ownership check at the query level, not a role lookup.
 
 Permissions are resource/action pairs defined once in `packages/core/src/auth/permissions.ts` — roles are just named bundles of them, never checked by name in route code.
 
@@ -130,14 +136,14 @@ Every route in `apps/api` (except `/health` and the `/api/auth/**` proxy, which 
 
 Run from the repo root (fans out via Turborepo) or scoped with `--filter @repo/api`:
 
-| Script | What it does |
-|---|---|
-| `pnpm dev` | Start `apps/api` in watch mode |
-| `pnpm build` | Compile all packages |
-| `pnpm test` | Run tests |
-| `pnpm typecheck` | `tsc --noEmit` across the monorepo |
+| Script             | What it does                                              |
+| ------------------ | --------------------------------------------------------- |
+| `pnpm dev`         | Start `apps/api` in watch mode                            |
+| `pnpm build`       | Compile all packages                                      |
+| `pnpm test`        | Run tests                                                 |
+| `pnpm typecheck`   | `tsc --noEmit` across the monorepo                        |
 | `pnpm db:generate` | Generate a SQL migration from `packages/db/src/schema.ts` |
-| `pnpm db:migrate` | Apply pending migrations to `DATABASE_URL` |
+| `pnpm db:migrate`  | Apply pending migrations to `DATABASE_URL`                |
 
 ## Adding a new feature
 
@@ -145,7 +151,7 @@ The `apps/api/src/modules/billing/` slice is the reference example — read it a
 
 1. **`widgets.schema.ts`** — Zod schemas for the request/response shapes. This is the single source of truth for that feature's types (`z.infer<typeof Schema>`, never a hand-written `interface`).
 2. **`widgets.db.ts`** — query functions using `db` from `@repo/db`. Always select explicit fields (`db.select({ id: widgets.id, name: widgets.name })`), never a raw full-row `select()` — don't leak columns the response doesn't need.
-3. **`widgets.routes.ts`** — a Hono router, and *only* a router: route registration, named middleware (`injectUserContext`, `requirePermission(...)`, or a `zValidator(...)` bound to that route's schema), and a handler that reads input, makes **one call**, and shapes the response via `success()`/`failure()`. The moment a handler needs more than one real step — deciding between outcomes, calling more than one thing in sequence — that logic moves to a new `widgets.service.ts` (called directly) or `widgets.handlers.ts` (reacting to an event/webhook), never inline in the route. See `AGENTS.md`'s "route handlers are delivery-layer glue" rule for the full reasoning and more examples.
+3. **`widgets.routes.ts`** — a Hono router, and _only_ a router: route registration, named middleware (`injectUserContext`, `requirePermission(...)`, or a `zValidator(...)` bound to that route's schema), and a handler that reads input, makes **one call**, and shapes the response via `success()`/`failure()`. The moment a handler needs more than one real step — deciding between outcomes, calling more than one thing in sequence — that logic moves to a new `widgets.service.ts` (called directly) or `widgets.handlers.ts` (reacting to an event/webhook), never inline in the route. See `AGENTS.md`'s "route handlers are delivery-layer glue" rule for the full reasoning and more examples.
 4. Mount it in `apps/api/src/app.ts` (not `index.ts` — that file is just the process entrypoint, `app.ts` is where routes get wired).
 
 If a new table is involved, add it to `packages/db/src/schema.ts`, then `pnpm db:generate && pnpm db:migrate`. (Exception: if you're extending an auth-related table like `user`, don't hand-edit the schema — see `AGENTS.md`'s note on regenerating Better Auth's schema via its CLI.)

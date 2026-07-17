@@ -21,7 +21,8 @@ function getStripeClient(): Stripe {
   return new Stripe(key);
 }
 
-const checkoutReturnUrl = process.env.BILLING_CHECKOUT_RETURN_URL ?? "http://localhost:3000/billing";
+const checkoutReturnUrl =
+  process.env.BILLING_CHECKOUT_RETURN_URL ?? "http://localhost:3000/billing";
 
 /**
  * Concrete Stripe adapter for the `BillingGateway` contract defined in
@@ -29,7 +30,11 @@ const checkoutReturnUrl = process.env.BILLING_CHECKOUT_RETURN_URL ?? "http://loc
  * see AGENTS.md's billing section.
  */
 export class StripeBillingService implements BillingGateway {
-  async createCheckoutSession(orgId: string, planId: PlanId, quantity: number): Promise<CheckoutSessionResult> {
+  async createCheckoutSession(
+    orgId: string,
+    planId: PlanId,
+    quantity: number,
+  ): Promise<CheckoutSessionResult> {
     const plan = plans[planId];
     if (!plan.providerPriceId) {
       throw new AppError("VALIDATION_ERROR", `Plan "${planId}" has no billable price configured`);
@@ -89,7 +94,12 @@ export class StripeBillingService implements BillingGateway {
         const session = event.data.object as Stripe.Checkout.Session;
         const orgId = session.client_reference_id;
         const planId = session.metadata?.planId as PlanId | undefined;
-        if (!orgId || !planId || typeof session.customer !== "string" || typeof session.subscription !== "string") {
+        if (
+          !orgId ||
+          !planId ||
+          typeof session.customer !== "string" ||
+          typeof session.subscription !== "string"
+        ) {
           return null;
         }
         return {

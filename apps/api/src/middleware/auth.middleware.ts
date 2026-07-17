@@ -3,7 +3,12 @@ import { auth } from "@repo/core/auth";
 import { AppError } from "@repo/core";
 
 export type UserContext =
-  | { mode: "B2B2C"; user: typeof auth.$Infer.Session.user; organizationId: string; roles: string[] }
+  | {
+      mode: "B2B2C";
+      user: typeof auth.$Infer.Session.user;
+      organizationId: string;
+      roles: string[];
+    }
   | { mode: "B2C"; user: typeof auth.$Infer.Session.user; organizationId: null; roles: string[] };
 
 declare module "hono" {
@@ -50,7 +55,10 @@ export const injectUserContext = createMiddleware(async (c, next) => {
  * already run. Kept out of `requirePermission` since that gate is about *what a member
  * can do*, not *whether an org exists at all*.
  */
-export function requireOrgContext(userContext: UserContext, message = "This action requires an active organization") {
+export function requireOrgContext(
+  userContext: UserContext,
+  message = "This action requires an active organization",
+) {
   if (userContext.mode !== "B2B2C") {
     throw new AppError("VALIDATION_ERROR", message);
   }
