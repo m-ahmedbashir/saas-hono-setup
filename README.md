@@ -141,12 +141,12 @@ Run from the repo root (fans out via Turborepo) or scoped with `--filter @repo/a
 
 ## Adding a new feature
 
-There's no example to copy yet, but the convention is fixed. A new feature (say, `widgets`) gets its own slice under `apps/api/src/modules/widgets/`:
+The `apps/api/src/modules/billing/` slice is the reference example — read it alongside this. A new feature (say, `widgets`) gets its own slice under `apps/api/src/modules/widgets/`:
 
 1. **`widgets.schema.ts`** — Zod schemas for the request/response shapes. This is the single source of truth for that feature's types (`z.infer<typeof Schema>`, never a hand-written `interface`).
 2. **`widgets.db.ts`** — query functions using `db` from `@repo/db`. Always select explicit fields (`db.select({ id: widgets.id, name: widgets.name })`), never a raw full-row `select()` — don't leak columns the response doesn't need.
-3. **`widgets.routes.ts`** — a Hono router. Validate input against the Zod schema, call the `.db.ts` functions, return via `success()`/`failure()` from `apps/api/src/lib/response.ts`. Apply `injectUserContext` (and `requirePermission(...)` if it needs permission gating) here, not inside the query functions.
-4. Mount it in `apps/api/src/index.ts`.
+3. **`widgets.routes.ts`** — a Hono router, and *only* a router: route registration, named middleware (`injectUserContext`, `requirePermission(...)`, or a `zValidator(...)` bound to that route's schema), and a handler that reads input, makes **one call**, and shapes the response via `success()`/`failure()`. The moment a handler needs more than one real step — deciding between outcomes, calling more than one thing in sequence — that logic moves to a new `widgets.service.ts` (called directly) or `widgets.handlers.ts` (reacting to an event/webhook), never inline in the route. See `AGENTS.md`'s "route handlers are delivery-layer glue" rule for the full reasoning and more examples.
+4. Mount it in `apps/api/src/app.ts` (not `index.ts` — that file is just the process entrypoint, `app.ts` is where routes get wired).
 
 If a new table is involved, add it to `packages/db/src/schema.ts`, then `pnpm db:generate && pnpm db:migrate`. (Exception: if you're extending an auth-related table like `user`, don't hand-edit the schema — see `AGENTS.md`'s note on regenerating Better Auth's schema via its CLI.)
 
