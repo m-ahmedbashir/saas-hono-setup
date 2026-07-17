@@ -22,7 +22,7 @@ export const app = new Hono()
     secureHeaders({
       strictTransportSecurity: "max-age=15552000; includeSubDomains",
       xFrameOptions: "DENY",
-    })
+    }),
   )
   .use(
     "*",
@@ -32,14 +32,14 @@ export const app = new Hono()
       allowHeaders: ["Content-Type", "Authorization"],
       credentials: true,
       maxAge: 600,
-    })
+    }),
   )
   .use(
     "*",
     bodyLimit({
       maxSize: 5 * 1024 * 1024,
       onError: (c) => failure(c, "PAYLOAD_TOO_LARGE", "Payload exceeds safe processing size", 413),
-    })
+    }),
   )
   .use("*", etag())
   .get("/health", (c) => c.json({ status: "ok" }))
@@ -58,12 +58,24 @@ app.onError((err, c) => {
   }
 
   if (err instanceof HTTPException) {
-    return failure(c, "HTTP_ERROR", err.message, err.status, isDev() ? { stack: err.stack } : undefined);
+    return failure(
+      c,
+      "HTTP_ERROR",
+      err.message,
+      err.status,
+      isDev() ? { stack: err.stack } : undefined,
+    );
   }
 
   console.error(err);
   Sentry.captureException(err);
-  return failure(c, "INTERNAL_ERROR", "Something went wrong", 500, isDev() ? { message: err.message, stack: err.stack } : undefined);
+  return failure(
+    c,
+    "INTERNAL_ERROR",
+    "Something went wrong",
+    500,
+    isDev() ? { message: err.message, stack: err.stack } : undefined,
+  );
 });
 
 export type AppType = typeof app;

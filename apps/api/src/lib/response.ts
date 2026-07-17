@@ -13,7 +13,7 @@ export function failure(
   code: ErrorCode | "HTTP_ERROR",
   message: string,
   status: ContentfulStatusCode,
-  details?: unknown
+  details?: unknown,
 ) {
   return c.json(
     {
@@ -24,6 +24,6 @@ export function failure(
         ...(isDev() && details !== undefined ? { details } : {}),
       },
     },
-    status
+    status,
   );
 }

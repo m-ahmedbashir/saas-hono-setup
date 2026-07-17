@@ -24,7 +24,7 @@ Point-in-time status of what's actually built and verified in this repo. This is
 
 ## Bugs found and fixed along the way (worth knowing so they aren't reintroduced)
 
-- Passing a custom `roles` map to Better Auth's `organization` plugin **replaces** its defaults rather than merging — since only `member`/`admin` were defined, every org's auto-assigned `owner` (its creator) had *zero* permissions until `ownerRole` was added explicitly.
+- Passing a custom `roles` map to Better Auth's `organization` plugin **replaces** its defaults rather than merging — since only `member`/`admin` were defined, every org's auto-assigned `owner` (its creator) had _zero_ permissions until `ownerRole` was added explicitly.
 - `betterAuth()` had no `trustedOrigins`, so it rejected requests from origins the Hono CORS middleware was already allowing — two separate checks. `trustedOrigins` now reads the same `ALLOWED_ORIGINS` env var as the CORS middleware, so they can't drift apart.
 - `NODE_ENV=<mode>` lines inside `.env.*` files were dead weight once `cross-env` was introduced (`cross-env` sets it before `--env-file` would even load, and `--env-file` never overrides an already-set var) — removed, including deleting the then-empty `.env.production`.
 

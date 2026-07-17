@@ -27,6 +27,6 @@ export function createNotificationsRoutes(upgradeWebSocket: UpgradeWebSocket) {
           notificationDispatcher.removeClient(userId);
         },
       };
-    })
+    }),
   );
 }

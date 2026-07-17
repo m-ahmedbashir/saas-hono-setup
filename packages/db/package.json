@@ -12,7 +12,9 @@
   "scripts": {
     "generate": "node --env-file=../../.env.development node_modules/drizzle-kit/bin.cjs generate",
     "migrate": "node --env-file=../../.env.development node_modules/drizzle-kit/bin.cjs migrate",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "drizzle-orm": "^0.38.0",
