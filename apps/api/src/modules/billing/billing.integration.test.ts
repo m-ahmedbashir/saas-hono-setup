@@ -97,6 +97,18 @@ describe("POST /billing/checkout", () => {
     expect(res.status).toBe(403);
   });
 
+  it("rejects a malformed body via the zValidator pre-route guard, in our envelope shape", async () => {
+    const res = await fetch(`http://localhost:${PORT}/billing/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: ownerCookie },
+      body: JSON.stringify({ planId: "not-a-real-plan", quantity: -5 }),
+    });
+    const body = (await res.json()) as { success: boolean; error?: { code: string } };
+    expect(res.status).toBe(422);
+    expect(body.success).toBe(false);
+    expect(body.error?.code).toBe("VALIDATION_ERROR");
+  });
+
   it("rejects a plan with no billable price configured (free)", async () => {
     const res = await fetch(`http://localhost:${PORT}/billing/checkout`, {
       method: "POST",

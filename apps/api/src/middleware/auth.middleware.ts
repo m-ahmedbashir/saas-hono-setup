@@ -2,7 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { auth } from "@repo/core/auth";
 import { AppError } from "@repo/core";
 
-type UserContext =
+export type UserContext =
   | { mode: "B2B2C"; user: typeof auth.$Infer.Session.user; organizationId: string; roles: string[] }
   | { mode: "B2C"; user: typeof auth.$Infer.Session.user; organizationId: null; roles: string[] };
 
@@ -41,3 +41,18 @@ export const injectUserContext = createMiddleware(async (c, next) => {
 
   await next();
 });
+
+/**
+ * Narrows `UserContext` to its B2B2C member, throwing if the caller has no active
+ * organization. This is TypeScript narrowing glue, not a reusable authorization gate —
+ * Hono's context typing doesn't narrow across a middleware/handler boundary, so a route
+ * needing `organizationId` still needs this one call even after `injectUserContext` has
+ * already run. Kept out of `requirePermission` since that gate is about *what a member
+ * can do*, not *whether an org exists at all*.
+ */
+export function requireOrgContext(userContext: UserContext, message = "This action requires an active organization") {
+  if (userContext.mode !== "B2B2C") {
+    throw new AppError("VALIDATION_ERROR", message);
+  }
+  return userContext;
+}
