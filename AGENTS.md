@@ -139,6 +139,13 @@ Two patterns — use the cheaper one whenever it answers the question:
 - Both patterns exercise the real app/route/middleware code, never a re-implementation.
 - No isolated test database exists yet — integration tests run against the dev DB, relying on strict self-cleanup. Check PROGRESS.md before assuming otherwise.
 
+## CI/CD
+
+- **Pre-commit** (Husky + lint-staged, `.husky/pre-commit`): staged `.ts`/`.tsx` get `eslint --fix` + `prettier --write`; staged `.json`/`.md`/`.yaml` get `prettier --write`. Runs automatically, don't bypass with `--no-verify`.
+- **CI** (`.github/workflows/ci.yml`, on PR/push to `main`): `quality` job (format check, lint, typecheck, build) must pass before `test` job runs (spins up a real `postgres:16` service, writes its own `.env.development`, runs `pnpm db:migrate` then `pnpm test`).
+- CI's `.env.development` sets a fake `STRIPE_WEBHOOK_SECRET` (so self-signed webhook tests still work) but deliberately has no `STRIPE_SECRET_KEY`/`STRIPE_PRICE_STARTER` — this is _why_ `billing.integration.test.ts`'s real-Stripe-checkout test uses `it.skipIf(!process.env.STRIPE_PRICE_STARTER)`. **Any new test needing a real third-party credential must skip gracefully the same way, or CI breaks.**
+- Adding a required env var for tests → add it to ci.yml's "Create test environment file" step too, or CI's `test` job fails even though local tests pass.
+
 ## Conventions
 
 - TypeScript strict mode everywhere, ESM (`"type": "module"`) in every package.
