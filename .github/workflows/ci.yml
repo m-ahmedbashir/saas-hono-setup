@@ -91,6 +91,8 @@ jobs:
           BETTER_AUTH_URL=http://localhost:8787
           ALLOWED_ORIGINS=http://localhost:3000
           PORT=8787
+          STRIPE_WEBHOOK_SECRET=whsec_test_secret_for_ci_only
+          BILLING_CHECKOUT_RETURN_URL=http://localhost:3000/billing
           EOF
 
       - name: Run migrations
