@@ -2,6 +2,35 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.11.0] — 2026-07-25
+
+### Added
+
+- `DELETE /organization` — permanently deletes the caller's active organization (billing, profile, memberships, pending invitations). Owner-only. Never touches any member's own account — deleting an org only ends membership, not any individual's personal data, since GDPR's right to erasure belongs to each data subject, not the org they belong to. See `AGENTS.md`'s "Organization deletion" section.
+
+### Fixed
+
+- Corrected a wrong claim from `0.8.0`'s account-deletion work: `ON DELETE CASCADE` is not subject to Row-Level Security in Postgres at all (confirmed directly against the database), contrary to what was documented and built around at the time. Simplified `account.service.ts`/`account.db.ts` accordingly — the explicit pre-deletion of RLS-protected child rows before their parent was never actually necessary; cascade alone was always sufficient.
+
+## [0.10.0] — 2026-07-25
+
+### Fixed
+
+- WebSocket dispatcher: a second connection for the same user (a second tab/device) used to silently overwrite the first's registration, and closing the _first_ connection then deleted the _second_'s still-open entry — a live socket left permanently unreachable. Reproduces with one user and two tabs; not a scale-only issue. Fixed with `Map<string, Set<WSContext>>` instead of one connection per user.
+- Postgres pool now has explicit, env-driven `max`/timeouts (`DB_POOL_MAX`/`DB_POOL_IDLE_TIMEOUT_MS`/`DB_POOL_CONNECTION_TIMEOUT_MS`) instead of node-postgres's defaults (`max: 10`, wait-forever connection timeout), plus a `pool.on("error", ...)` handler — an unhandled error on an idle pooled client otherwise crashes the whole process.
+- Added graceful shutdown on `SIGTERM`/`SIGINT` — drains in-flight requests and closes the DB pool before exit, instead of a deploy/scale-down signal killing the process mid-request.
+- Stripe checkout creation now accepts an optional `Idempotency-Key` request header, passed through to Stripe — protects against a retried checkout request minting a duplicate session, which the Stripe SDK's own auto-generated per-call key does not (it only protects the SDK's internal network-retry).
+
+### Changed — **breaking**
+
+- `NotificationDispatcher.removeClient` (`packages/core`) now takes `(userId, client)` instead of `(userId)` — required to distinguish which of a user's possibly-multiple live connections closed. Any custom `NotificationDispatcher` implementation needs updating.
+
+## [0.9.0] — 2026-07-25
+
+### Added
+
+- Organization profile: industry, company size, website, phone, tax ID, description, structured address, and `orgNumber` — a permanent, human-friendly, unique, indexed org identifier (not a join/invite credential — see `AGENTS.md`). `GET`/`PATCH /organization-profile`, RLS-enabled, owner/admin-only edits via a new `organizationProfile: ["manage"]` permission. Unlike every other table in this app, the profile row is created eagerly at org creation (a real, verified Better Auth `afterCreateOrganization` hook), not lazily on first access. See `AGENTS.md`'s "Organization Profile" section.
+
 ## [0.8.0] — 2026-07-24
 
 ### Added

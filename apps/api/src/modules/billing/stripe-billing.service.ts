@@ -36,20 +36,24 @@ export class StripeBillingService implements BillingGateway {
     orgId: string,
     planId: OrganizationPlanId,
     quantity: number,
+    idempotencyKey?: string,
   ): Promise<CheckoutSessionResult> {
     const plan = organizationPlans[planId];
     if (!plan.providerPriceId) {
       throw new AppError("VALIDATION_ERROR", `Plan "${planId}" has no billable price configured`);
     }
 
-    const session = await getStripeClient().checkout.sessions.create({
-      mode: "subscription",
-      client_reference_id: orgId,
-      line_items: [{ price: plan.providerPriceId, quantity }],
-      success_url: `${checkoutReturnUrl}?checkout=success`,
-      cancel_url: `${checkoutReturnUrl}?checkout=cancelled`,
-      metadata: { ownerType: "organization", ownerId: orgId, planId },
-    });
+    const session = await getStripeClient().checkout.sessions.create(
+      {
+        mode: "subscription",
+        client_reference_id: orgId,
+        line_items: [{ price: plan.providerPriceId, quantity }],
+        success_url: `${checkoutReturnUrl}?checkout=success`,
+        cancel_url: `${checkoutReturnUrl}?checkout=cancelled`,
+        metadata: { ownerType: "organization", ownerId: orgId, planId },
+      },
+      idempotencyKey ? { idempotencyKey } : undefined,
+    );
 
     if (!session.url) {
       throw new AppError("INTERNAL_ERROR", "Stripe did not return a checkout URL");
@@ -61,20 +65,24 @@ export class StripeBillingService implements BillingGateway {
   async createIndividualCheckoutSession(
     userId: string,
     planId: IndividualPlanId,
+    idempotencyKey?: string,
   ): Promise<CheckoutSessionResult> {
     const plan = individualPlans[planId];
     if (!plan.providerPriceId) {
       throw new AppError("VALIDATION_ERROR", `Plan "${planId}" has no billable price configured`);
     }
 
-    const session = await getStripeClient().checkout.sessions.create({
-      mode: "subscription",
-      client_reference_id: userId,
-      line_items: [{ price: plan.providerPriceId, quantity: 1 }],
-      success_url: `${checkoutReturnUrl}?checkout=success`,
-      cancel_url: `${checkoutReturnUrl}?checkout=cancelled`,
-      metadata: { ownerType: "individual", ownerId: userId, planId },
-    });
+    const session = await getStripeClient().checkout.sessions.create(
+      {
+        mode: "subscription",
+        client_reference_id: userId,
+        line_items: [{ price: plan.providerPriceId, quantity: 1 }],
+        success_url: `${checkoutReturnUrl}?checkout=success`,
+        cancel_url: `${checkoutReturnUrl}?checkout=cancelled`,
+        metadata: { ownerType: "individual", ownerId: userId, planId },
+      },
+      idempotencyKey ? { idempotencyKey } : undefined,
+    );
 
     if (!session.url) {
       throw new AppError("INTERNAL_ERROR", "Stripe did not return a checkout URL");

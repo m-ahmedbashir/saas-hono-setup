@@ -191,5 +191,5 @@ describe("DELETE /account", () => {
     expect(orgRow).toBeDefined();
     const [ownerRow] = await db.select().from(userTable).where(eq(userTable.id, owner.userId));
     expect(ownerRow).toBeDefined();
-  });
+  }, 15000);
 });

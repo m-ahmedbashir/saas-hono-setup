@@ -13,8 +13,8 @@ export function notificationSocketHandler(c: Context): WSEvents {
     onOpen: (_evt, ws) => {
       notificationDispatcher.registerClient(userId, ws);
     },
-    onClose: () => {
-      notificationDispatcher.removeClient(userId);
+    onClose: (_evt, ws) => {
+      notificationDispatcher.removeClient(userId, ws);
     },
   };
 }

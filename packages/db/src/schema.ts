@@ -180,6 +180,55 @@ export const organizationBillingRelations = relations(organizationBilling, ({ on
   }),
 }));
 
+// Not a Better Auth-generated table — hand-written, own table rather than columns on
+// `organization` for the same reason as organizationBilling. Unlike billing/profile
+// elsewhere in this file, this row is created eagerly (via a Better Auth
+// `afterCreateOrganization` hook, see packages/core/src/auth/index.ts) rather than
+// lazily on first access — `orgNumber` specifically needs to exist reliably from the
+// moment the org exists, not "whenever someone first opens settings." See AGENTS.md's
+// Organization Profile section.
+export const organizationProfile = pgTable(
+  "organization_profile",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .unique()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    // Permanent, human-friendly, low-sensitivity identifier — safe to display/log/read
+    // aloud. Deliberately NOT a join/invite credential (see AGENTS.md) — just an
+    // identity reference, generated in packages/db/src/organization-profile.ts.
+    orgNumber: text("org_number").notNull().unique(),
+    industry: text("industry"),
+    companySize: text("company_size"),
+    website: text("website"),
+    phone: text("phone"),
+    taxId: text("tax_id"),
+    description: text("description"),
+    addressStreet: text("address_street"),
+    addressCity: text("address_city"),
+    addressState: text("address_state"),
+    addressPostalCode: text("address_postal_code"),
+    addressCountry: text("address_country"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("organization_profile_organizationId_idx").on(table.organizationId),
+    index("organization_profile_orgNumber_idx").on(table.orgNumber),
+  ],
+);
+
+export const organizationProfileRelations = relations(organizationProfile, ({ one }) => ({
+  organization: one(organization, {
+    fields: [organizationProfile.organizationId],
+    references: [organization.id],
+  }),
+}));
+
 // Individual (B2C) billing — a separate table from `organizationBilling`, not a
 // nullable-fields variant of it. No seat/quantity concept for an individual, so
 // reusing that shape would mean a meaningless `seatQuantity` on every row. FK'd to

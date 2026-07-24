@@ -18,6 +18,7 @@ export async function organizationCheckoutHandler(
     userContext.organizationId,
     planId,
     quantity,
+    c.req.header("Idempotency-Key"),
   );
 
   return success(c, { checkoutUrl });
@@ -31,6 +32,7 @@ export async function individualCheckoutHandler(
   const { checkoutUrl } = await billingService.createIndividualCheckoutSession(
     userContext.user.id,
     planId,
+    c.req.header("Idempotency-Key"),
   );
 
   return success(c, { checkoutUrl });

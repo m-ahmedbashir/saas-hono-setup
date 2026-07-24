@@ -14,12 +14,35 @@ if (!process.env.APP_DATABASE_URL) {
   );
 }
 
+// node-postgres's own defaults are wrong for production: max: 10 caps this whole app
+// (across every request that touches the DB) at 10 concurrent queries regardless of
+// traffic, and connectionTimeoutMillis: 0 means a request waiting for a free connection
+// waits forever instead of failing fast with a clear error. Made explicit and
+// env-tunable rather than left implicit.
 const pool = new Pool({
   connectionString: process.env.APP_DATABASE_URL,
+  max: Number(process.env.DB_POOL_MAX ?? 20),
+  idleTimeoutMillis: Number(process.env.DB_POOL_IDLE_TIMEOUT_MS ?? 30_000),
+  connectionTimeoutMillis: Number(process.env.DB_POOL_CONNECTION_TIMEOUT_MS ?? 10_000),
+});
+
+// An idle pooled client can emit an unexpected 'error' event (e.g. the server dropped
+// the connection) — pg's own docs warn that leaving this unhandled crashes the whole
+// process, since an unhandled 'error' on any Node EventEmitter throws. Log and move on;
+// the pool replaces the dead client on its own.
+pool.on("error", (err) => {
+  console.error("Unexpected error on idle Postgres client", err);
 });
 
 export const db = drizzle(pool, { schema });
+
+/** For graceful shutdown (apps/api/src/index.ts) — closes every pooled connection. */
+export async function closePool(): Promise<void> {
+  await pool.end();
+}
+
 export * from "./schema";
+export * from "./organization-profile";
 export { eq, and, count } from "drizzle-orm";
 
 /** Whatever `db.transaction`'s callback receives — a `db`-shaped executor, scoped to one transaction. */

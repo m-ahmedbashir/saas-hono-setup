@@ -1,27 +1,13 @@
-import { db, withOrgScope, withUserScope } from "@repo/db";
+import { db, withUserScope } from "@repo/db";
 import { AppError } from "@repo/core";
 import { billingService } from "../billing/stripe-billing.service";
+import { deleteOrganization } from "../organization/organization.service";
 import {
   getOrganizationsOwnedBy,
   getOrganizationMemberCount,
-  getOrganizationSubscriptionId,
   getIndividualSubscriptionId,
-  deleteOrganizationBilling,
-  deleteOrganization,
-  deleteProfileAndIndividualBilling,
   deleteUser,
 } from "./account.db";
-
-// `profile`/`individual_billing`/`organization_billing` all have FORCE ROW LEVEL
-// SECURITY (see AGENTS.md). Postgres applies RLS policies to rows touched by an
-// ON DELETE CASCADE action too, not just direct statements — so deleting `user`/
-// `organization` and trusting the FK cascade to clean up those specific child tables
-// would run their cascade-delete unscoped (no app.current_user_id/current_org_id set),
-// which the fail-closed policy would then block, turning the FK constraint into a hard
-// error instead of a clean delete. Explicitly deleting the RLS-protected rows first,
-// under the correct scope, avoids relying on cascade to do something RLS is designed to
-// prevent by default. Non-RLS tables (session, account, member, invitation, organization
-// itself) are left to cascade normally.
 
 /**
  * Best-effort — a live Stripe subscription being uncancellable (API down, no
@@ -55,21 +41,17 @@ export async function deleteAccount(userId: string): Promise<void> {
 
   // Only reached once every owned org has either no other members or doesn't exist —
   // an org this user solely owns and is the only member of has nothing to hand off, so
-  // it's deleted along with the account rather than left permanently orphaned.
+  // it's deleted along with the account rather than left permanently orphaned. Reuses
+  // organization.service.ts's deleteOrganization (same subscription-cancel + delete
+  // sequence a direct DELETE /organization does) rather than duplicating it here.
   for (const org of soloOrganizations) {
-    const subscriptionId = await withOrgScope(org.id, (tx) =>
-      getOrganizationSubscriptionId(tx, org.id),
-    );
-    await cancelSubscriptionBestEffort(subscriptionId);
-    await withOrgScope(org.id, (tx) => deleteOrganizationBilling(tx, org.id));
-    await deleteOrganization(db, org.id);
+    await deleteOrganization(org.id);
   }
 
   const individualSubscriptionId = await withUserScope(userId, (tx) =>
     getIndividualSubscriptionId(tx, userId),
   );
   await cancelSubscriptionBestEffort(individualSubscriptionId);
-  await withUserScope(userId, (tx) => deleteProfileAndIndividualBilling(tx, userId));
 
   await deleteUser(db, userId);
 }

@@ -104,15 +104,25 @@ export type BillingEvent =
  * interface-in-core / implementation-in-apps/api split as `NotificationDispatcher`.
  */
 export interface BillingGateway {
+  /**
+   * `idempotencyKey`, when the caller supplies one (e.g. an `Idempotency-Key` request
+   * header), is passed straight through to the vendor so a retried HTTP request to this
+   * API returns the same checkout session instead of creating a second one. The vendor
+   * SDK generating its own key per call (which the Stripe adapter's underlying SDK does)
+   * only protects its own internal network-retry — it can't protect against our own
+   * caller retrying the request to us, since that looks like a brand new call each time.
+   */
   createCheckoutSession(
     orgId: string,
     planId: OrganizationPlanId,
     quantity: number,
+    idempotencyKey?: string,
   ): Promise<CheckoutSessionResult>;
   /** Individual billing has no seat/quantity concept — always a quantity of one. */
   createIndividualCheckoutSession(
     userId: string,
     planId: IndividualPlanId,
+    idempotencyKey?: string,
   ): Promise<CheckoutSessionResult>;
   updateSubscriptionQuantity(subscriptionId: string, quantity: number): Promise<void>;
   cancelSubscription(subscriptionId: string): Promise<void>;
