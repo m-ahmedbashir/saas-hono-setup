@@ -38,3 +38,12 @@ export const ownerRole = accessControl.newRole({
   organizationProfile: ["manage"],
   organization: ["delete"],
 });
+
+/**
+ * Role name → Role object, the single source of truth for both the organization
+ * plugin's `roles` config (`auth/index.ts`) and `requirePermission`'s in-process
+ * permission check (`middleware/permission.middleware.ts`) — previously duplicated as
+ * an inline object literal in the former; extracted so there's exactly one place this
+ * mapping is defined.
+ */
+export const roles = { owner: ownerRole, member: memberRole, admin: adminRole };
