@@ -3,9 +3,9 @@ import { organization } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db, withOrgScope, ensureOrganizationProfileRow } from "@repo/db";
 import * as schema from "@repo/db/schema";
-import { accessControl, memberRole, adminRole, ownerRole } from "./permissions";
+import { accessControl, roles } from "./permissions";
 
-export { statement } from "./permissions";
+export { statement, roles } from "./permissions";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg", schema }),
@@ -18,11 +18,7 @@ export const auth = betterAuth({
   plugins: [
     organization({
       ac: accessControl,
-      roles: {
-        owner: ownerRole,
-        member: memberRole,
-        admin: adminRole,
-      },
+      roles,
       // A second instance of this file's one documented DIP exception (importing `db`
       // for the adapter above) — Better Auth's hook API can only be wired here, inside
       // the same betterAuth() config, so the organization_profile row (specifically its

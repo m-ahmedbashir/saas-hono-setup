@@ -12,6 +12,10 @@ All notable changes to this project are documented here. Format loosely follows 
 
 - Corrected a wrong claim from `0.8.0`'s account-deletion work: `ON DELETE CASCADE` is not subject to Row-Level Security in Postgres at all (confirmed directly against the database), contrary to what was documented and built around at the time. Simplified `account.service.ts`/`account.db.ts` accordingly — the explicit pre-deletion of RLS-protected child rows before their parent was never actually necessary; cascade alone was always sufficient.
 
+### Changed
+
+- `requirePermission` no longer calls `auth.api.hasPermission(...)` — that re-derived the session and re-fetched the member's role from the DB, both already resolved earlier in the same request by `injectUserContext`. Now calls the same underlying `Role.authorize()` (a pure, synchronous, in-memory check) directly. No behavior change, one fewer DB round-trip per permission-gated request.
+
 ## [0.10.0] — 2026-07-25
 
 ### Fixed
