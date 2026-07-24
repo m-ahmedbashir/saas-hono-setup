@@ -90,7 +90,7 @@ See `.env.example` for the full list with comments. Summary:
 ```
 apps/api/                  Hono server — the only deployable app right now
   src/index.ts              entrypoint: middleware chain, route composition, exports AppType for RPC clients
-  src/middleware/            injectUserContext (auth), requirePermission (PBAC)
+  src/middleware/            injectUserContext (auth), requirePermission (PBAC), requireFeature (plan entitlements)
   src/lib/                   response.ts — the API's success/error envelope
   src/modules/auth/          proxies to Better Auth's own handler
 

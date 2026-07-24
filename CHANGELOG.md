@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.6.0] — 2026-07-24
+
+### Added
+
+- In-house feature entitlement system for gating routes/capabilities behind a subscription plan, zero external dependencies — `PlanEntitlements`/`BillingOwner`/`canAccessFeature`/`getPlanLimit` (`packages/core/src/billing/entitlements.ts`), and one `requireFeature(feature, scope)` Hono middleware (`apps/api/src/middleware/entitlement.middleware.ts`) covering both organization and individual billing. `scope` is a required argument, never inferred from session mode — see `ENTITLEMENTS.md` for the full design and why that matters.
+
 ## [0.5.0] — 2026-07-24
 
 ### Added

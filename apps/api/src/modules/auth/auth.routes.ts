@@ -1,6 +1,4 @@
 import { Hono } from "hono";
-import { auth } from "@repo/core/auth";
+import { proxyToAuthHandler } from "./auth.controller";
 
-export const authRoutes = new Hono().on(["POST", "GET"], "/**", (c) => {
-  return auth.handler(c.req.raw);
-});
+export const authRoutes = new Hono().on(["POST", "GET"], "/**", proxyToAuthHandler);
