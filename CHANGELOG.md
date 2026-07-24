@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.4.0] — 2026-07-24
+
+### Added
+
+- Row-Level Security on the `billing` table — defense-in-depth on top of (not instead of) existing app-level auth checks. `withOrgScope`/`withSystemScope` transaction helpers (`packages/db/src/index.ts`), `packages/db/scripts/create-app-role.js` to provision the restricted DB role this requires, and a real proof test (`billing.integration.test.ts`) that an unscoped or wrong-org query returns nothing. See `AGENTS.md`'s new Row-Level Security section for the full pattern — required reading before adding RLS to any other table.
+
+### Fixed
+
+- The app's DB connection role (Neon's default owner role) had `BYPASSRLS` granted directly on it, which made the RLS policy above completely inert despite `FORCE ROW LEVEL SECURITY` being set — `FORCE` only overrides table-owner exemption, not a role-level `BYPASSRLS` grant. Caught by the new proof test failing on its first run, not assumed to be fine. Fixed by introducing a second, restricted role for runtime queries.
+
+### Changed — **breaking**
+
+- New required env var `APP_DATABASE_URL` (a restricted DB role, no `BYPASSRLS`) — `packages/db/src/index.ts` now throws at import time if it's unset, rather than silently using `DATABASE_URL`'s owner role for runtime queries. `DATABASE_URL` is now used only for migrations. Any existing deployment needs to provision this role (`pnpm --filter @repo/db create-app-role`) and set the new var before upgrading.
+
 ## [0.3.0] — 2026-07-17
 
 ### Added

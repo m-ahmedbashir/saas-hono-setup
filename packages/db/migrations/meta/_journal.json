@@ -15,6 +15,13 @@
       "when": 1784318378207,
       "tag": "0001_tired_the_enforcers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784845055803,
+      "tag": "0002_billing_rls",
+      "breakpoints": true
     }
   ]
 }
