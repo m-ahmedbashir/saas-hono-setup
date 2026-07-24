@@ -11,7 +11,10 @@ const ownerUrl = process.env.DATABASE_URL;
 const password = process.env.APP_ROLE_PASSWORD;
 
 if (!ownerUrl) throw new Error("DATABASE_URL (the owner/migration role) must be set");
-if (!password) throw new Error("APP_ROLE_PASSWORD must be set — generate one yourself, don't hardcode a default");
+if (!password)
+  throw new Error(
+    "APP_ROLE_PASSWORD must be set — generate one yourself, don't hardcode a default",
+  );
 
 const client = new Client({ connectionString: ownerUrl });
 await client.connect();
@@ -37,18 +40,24 @@ if (exists.rows.length > 0) {
 }
 
 await client.query("GRANT USAGE ON SCHEMA public TO app_user");
-await client.query("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user");
+await client.query(
+  "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user",
+);
 await client.query("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user");
 // So tables added by future migrations are automatically covered — no manual grant
 // needed every time a new table lands.
 await client.query(
   "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user",
 );
-await client.query("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app_user");
+await client.query(
+  "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app_user",
+);
 
 const check = await client.query("select rolbypassrls from pg_roles where rolname = 'app_user'");
 if (check.rows[0].rolbypassrls) {
-  throw new Error("app_user has BYPASSRLS set — something overrode NOBYPASSRLS, refusing to continue silently");
+  throw new Error(
+    "app_user has BYPASSRLS set — something overrode NOBYPASSRLS, refusing to continue silently",
+  );
 }
 
 console.log("Grants applied. app_user confirmed to NOT have BYPASSRLS.");
