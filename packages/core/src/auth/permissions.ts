@@ -5,6 +5,10 @@ export const statement = {
   exercise: ["create", "read", "update", "delete"],
   billing: ["manage"],
   organizationProfile: ["manage"],
+  // Owner-only, not granted to adminRole — permanently destroying the organization (and
+  // every member's access to it) is more severe than anything organizationProfile:manage
+  // covers, so it gets its own, stricter permission rather than reusing that one.
+  organization: ["delete"],
 } as const;
 
 export const accessControl = createAccessControl(statement);
@@ -32,4 +36,5 @@ export const ownerRole = accessControl.newRole({
   exercise: ["create", "read", "update", "delete"],
   billing: ["manage"],
   organizationProfile: ["manage"],
+  organization: ["delete"],
 });

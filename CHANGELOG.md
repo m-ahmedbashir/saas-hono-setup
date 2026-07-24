@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.11.0] — 2026-07-25
+
+### Added
+
+- `DELETE /organization` — permanently deletes the caller's active organization (billing, profile, memberships, pending invitations). Owner-only. Never touches any member's own account — deleting an org only ends membership, not any individual's personal data, since GDPR's right to erasure belongs to each data subject, not the org they belong to. See `AGENTS.md`'s "Organization deletion" section.
+
+### Fixed
+
+- Corrected a wrong claim from `0.8.0`'s account-deletion work: `ON DELETE CASCADE` is not subject to Row-Level Security in Postgres at all (confirmed directly against the database), contrary to what was documented and built around at the time. Simplified `account.service.ts`/`account.db.ts` accordingly — the explicit pre-deletion of RLS-protected child rows before their parent was never actually necessary; cascade alone was always sufficient.
+
 ## [0.10.0] — 2026-07-25
 
 ### Fixed
