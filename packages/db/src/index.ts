@@ -47,6 +47,23 @@ export async function withOrgScope<T>(
 }
 
 /**
+ * Same as `withOrgScope`, scoped by `userId` instead — for tables owned by an
+ * individual rather than an organization (e.g. `user_billing`). Sets a *different*
+ * session variable (`app.current_user_id`), so a single transaction could in principle
+ * scope both if a query ever needed both an org and a user context — not currently
+ * used that way, but the two are deliberately independent settings, not one shared key.
+ */
+export async function withUserScope<T>(
+  userId: string,
+  callback: (tx: DbExecutor) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.current_user_id', ${userId}, true)`);
+    return callback(tx);
+  });
+}
+
+/**
  * Runs `callback` inside a transaction that bypasses per-org RLS scoping entirely.
  * Only for contexts trusted through a *different* mechanism than a user session —
  * e.g. a Stripe webhook, whose trust boundary is its verified signature, not an

@@ -140,8 +140,8 @@ export const invitation = pgTable(
 // migrated normally via drizzle-kit. FK'd to `organization.id` rather than adding
 // columns to `organization` itself, since that table IS generated and would drift
 // on the next `@better-auth/cli generate` run. See AGENTS.md's billing section.
-export const billing = pgTable(
-  "billing",
+export const organizationBilling = pgTable(
+  "organization_billing",
   {
     id: text("id").primaryKey(),
     organizationId: text("organization_id")
@@ -164,13 +164,47 @@ export const billing = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("billing_organizationId_idx").on(table.organizationId)],
+  (table) => [index("organization_billing_organizationId_idx").on(table.organizationId)],
 );
 
-export const billingRelations = relations(billing, ({ one }) => ({
+export const organizationBillingRelations = relations(organizationBilling, ({ one }) => ({
   organization: one(organization, {
-    fields: [billing.organizationId],
+    fields: [organizationBilling.organizationId],
     references: [organization.id],
+  }),
+}));
+
+// Individual (B2C) billing — a separate table from `organizationBilling`, not a
+// nullable-fields variant of it. No seat/quantity concept for an individual, so
+// reusing that shape would mean a meaningless `seatQuantity` on every row. FK'd to
+// `user.id`, same "own table, not columns on the generated table" reasoning as
+// `organizationBilling` vs `organization`. See AGENTS.md's Billing model section.
+export const individualBilling = pgTable(
+  "individual_billing",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .unique()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Matches @repo/core's IndividualPlanId ("individual_free" | "individual_pro").
+    plan: text("plan").notNull().default("individual_free"),
+    providerCustomerId: text("provider_customer_id"),
+    providerSubscriptionId: text("provider_subscription_id"),
+    subscriptionStatus: text("subscription_status"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("individual_billing_userId_idx").on(table.userId)],
+);
+
+export const individualBillingRelations = relations(individualBilling, ({ one }) => ({
+  user: one(user, {
+    fields: [individualBilling.userId],
+    references: [user.id],
   }),
 }));
 

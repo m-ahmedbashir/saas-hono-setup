@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { member, eq, count, withOrgScope } from "@repo/db";
 import { AppError, plans, type PlanId } from "@repo/core";
-import { getBillingByOrgId } from "../modules/billing/billing.db";
+import { getBillingByOrgId } from "../modules/billing/organization-billing.db";
 
 /**
  * Blocks an org-scoped action once active member count reaches the org's

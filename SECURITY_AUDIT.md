@@ -16,6 +16,16 @@ What happened: the app's DB connection role (Neon's default owner role, `neondb_
 
 The lesson generalizes beyond this one column: **on any Postgres host, verify the app's actual connection role doesn't have `BYPASSRLS`/superuser before trusting that RLS does anything** — don't assume a "just enable RLS" migration is sufficient without a test that proves an unscoped query actually sees nothing.
 
+## Update — 2026-07-24: individual (B2C) billing added
+
+New surface since the previous update: `POST /billing/individual-checkout` and the `individual_billing` table (RLS-enabled, same pattern as `organization_billing`). Also renamed both tables (`billing`→`organization_billing`, `user_billing`→`individual_billing`) and the org checkout route (`/billing/checkout`→`/billing/organization-checkout`) for a consistent pairing.
+
+Re-ran the same "can an authenticated user touch another user's/org's data" analysis specifically for the new code, via an independent sub-agent review (not just self-review) covering: whether `ownerId`/`ownerType` in webhook events could ever be attacker-influenced (no — both are server-set at checkout time, only trusted after Stripe signature verification), whether the new dual-table webhook update pattern (subscription lifecycle events update both tables by `providerSubscriptionId` unconditionally, since that event type doesn't indicate which table owns the subscription) could cross-contaminate an org's and an individual's data (no — Stripe subscription ids are unique per subscription, so the non-matching table's update is a genuine no-op, verified with a dedicated test asserting `organization_billing` stays empty after an individual checkout webhook), and whether `/billing/individual-checkout`'s lack of a permission check (only `injectUserContext`, no `requirePermission`) is a gap (no — it's an intentional ownership check, same pattern as B2C data access elsewhere, scoped to the session's own `userContext.user.id`).
+
+Two candidates were investigated and both filtered out as false positives (independently re-scored 2/10 each, below the reporting bar): a DDL-injection theoretical concern in `create-app-role.js` (relies on controlling an environment variable, which is a trusted value per this review's own precedents — not attacker-reachable), and the pre-existing missing-`UNIQUE`-constraint-on-`providerSubscriptionId` note (still a defense-in-depth gap, still not exploitable — Stripe subscription ids can't collide or be attacker-chosen anywhere in this codebase's flows).
+
+No new findings.
+
 ## Billing module
 
 ### `POST /billing/checkout`

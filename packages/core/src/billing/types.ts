@@ -30,6 +30,29 @@ export const plans: Record<PlanId, PlanConfig> = {
   },
 };
 
+/**
+ * Individual (B2C) billing tiers — deliberately a separate map from `plans`, not a
+ * variant of it. An individual isn't seat-based (no `seatLimit`/quantity concept),
+ * so forcing it into `PlanConfig`'s shape would mean a meaningless field on one side
+ * or the other. See AGENTS.md's Billing model section for the organization-vs-individual split.
+ */
+export type IndividualPlanId = "individual_free" | "individual_pro";
+
+export interface IndividualPlanConfig {
+  id: IndividualPlanId;
+  name: string;
+  providerPriceId: string | null;
+}
+
+export const individualPlans: Record<IndividualPlanId, IndividualPlanConfig> = {
+  individual_free: { id: "individual_free", name: "Individual Free", providerPriceId: null },
+  individual_pro: {
+    id: "individual_pro",
+    name: "Individual Pro",
+    providerPriceId: process.env.STRIPE_PRICE_INDIVIDUAL_PRO ?? null,
+  },
+};
+
 /** Normalized across vendors — a `BillingGateway` implementation maps its own provider's statuses onto this set. */
 export type SubscriptionStatus = "active" | "past_due" | "canceled" | "incomplete";
 
@@ -42,14 +65,29 @@ export interface CheckoutSessionResult {
  * away. Without this, the webhook *route* would have to import the vendor SDK
  * itself just to read event payloads — defeating the "swap vendor, touch zero
  * routes" goal for the one part of a billing integration where that's hardest.
+ *
+ * `checkout_completed` is a discriminated union on `ownerType` (not just `orgId`
+ * widened to a generic id) because organization and individual checkouts resolve to
+ * different plan maps (`PlanId` vs `IndividualPlanId`) — the handler branches on
+ * `ownerType` to decide which table (`billing` vs `user_billing`) to write to, and
+ * TypeScript narrows `planId`'s type along with it.
  */
 export type BillingEvent =
   | {
       type: "checkout_completed";
-      orgId: string;
+      ownerType: "organization";
+      ownerId: string;
       providerCustomerId: string;
       providerSubscriptionId: string;
       planId: PlanId;
+    }
+  | {
+      type: "checkout_completed";
+      ownerType: "individual";
+      ownerId: string;
+      providerCustomerId: string;
+      providerSubscriptionId: string;
+      planId: IndividualPlanId;
     }
   | {
       type: "subscription_updated";
@@ -70,6 +108,11 @@ export interface BillingGateway {
     orgId: string,
     planId: PlanId,
     quantity: number,
+  ): Promise<CheckoutSessionResult>;
+  /** Individual billing has no seat/quantity concept — always a quantity of one. */
+  createIndividualCheckoutSession(
+    userId: string,
+    planId: IndividualPlanId,
   ): Promise<CheckoutSessionResult>;
   updateSubscriptionQuantity(subscriptionId: string, quantity: number): Promise<void>;
   cancelSubscription(subscriptionId: string): Promise<void>;
