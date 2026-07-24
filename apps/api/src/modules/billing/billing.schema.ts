@@ -1,10 +1,13 @@
 import { z } from "zod";
-import { plans, individualPlans } from "@repo/core";
+import { organizationPlans, individualPlans } from "@repo/core";
 
-const planIds = Object.keys(plans) as [keyof typeof plans, ...(keyof typeof plans)[]];
+const organizationPlanIds = Object.keys(organizationPlans) as [
+  keyof typeof organizationPlans,
+  ...(keyof typeof organizationPlans)[],
+];
 
 export const checkoutRequestSchema = z.object({
-  planId: z.enum(planIds),
+  planId: z.enum(organizationPlanIds),
   quantity: z.number().int().positive().max(1000),
 });
 

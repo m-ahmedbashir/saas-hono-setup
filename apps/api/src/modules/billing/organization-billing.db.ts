@@ -1,5 +1,5 @@
 import { organizationBilling, eq, type DbExecutor } from "@repo/db";
-import type { PlanId, SubscriptionStatus } from "@repo/core";
+import type { OrganizationPlanId, SubscriptionStatus } from "@repo/core";
 
 // Every function here requires an explicit `tx` — a `withOrgScope`/`withSystemScope`
 // transaction executor from @repo/db, never the bare `db` client — so it's impossible
@@ -28,7 +28,7 @@ export async function ensureBillingRow(tx: DbExecutor, organizationId: string) {
 }
 
 interface BillingUpdate {
-  plan: PlanId;
+  plan: OrganizationPlanId;
   providerCustomerId: string;
   providerSubscriptionId: string;
   subscriptionStatus: SubscriptionStatus;

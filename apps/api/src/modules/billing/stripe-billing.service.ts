@@ -1,13 +1,13 @@
 import Stripe from "stripe";
 import {
   AppError,
-  plans,
+  organizationPlans,
   individualPlans,
   type BillingEvent,
   type BillingGateway,
   type CheckoutSessionResult,
   type IndividualPlanId,
-  type PlanId,
+  type OrganizationPlanId,
   type SubscriptionStatus,
 } from "@repo/core";
 
@@ -34,10 +34,10 @@ const checkoutReturnUrl =
 export class StripeBillingService implements BillingGateway {
   async createCheckoutSession(
     orgId: string,
-    planId: PlanId,
+    planId: OrganizationPlanId,
     quantity: number,
   ): Promise<CheckoutSessionResult> {
-    const plan = plans[planId];
+    const plan = organizationPlans[planId];
     if (!plan.providerPriceId) {
       throw new AppError("VALIDATION_ERROR", `Plan "${planId}" has no billable price configured`);
     }
@@ -138,7 +138,7 @@ export class StripeBillingService implements BillingGateway {
           providerSubscriptionId: session.subscription,
         };
         if (ownerType === "organization") {
-          return { ...shared, ownerType, planId: planId as PlanId };
+          return { ...shared, ownerType, planId: planId as OrganizationPlanId };
         }
         if (ownerType === "individual") {
           return { ...shared, ownerType, planId: planId as IndividualPlanId };

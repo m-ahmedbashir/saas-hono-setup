@@ -1,7 +1,7 @@
-export type PlanId = "free" | "starter" | "growth";
+export type OrganizationPlanId = "free" | "starter" | "growth";
 
-export interface PlanConfig {
-  id: PlanId;
+export interface OrganizationPlanConfig {
+  id: OrganizationPlanId;
   name: string;
   seatLimit: number;
   /** Vendor-specific price identifier (e.g. a Stripe Price ID). `null` for a plan with no paid provider-side counterpart. */
@@ -11,10 +11,10 @@ export interface PlanConfig {
 /**
  * Example tier map for this foundation — a real product replaces these three
  * with its own tiers/limits. Kept here (not hand-scaffolded further) since
- * `BillingGateway` and the seat-limit middleware need *some* concrete PlanId
+ * `BillingGateway` and the seat-limit middleware need *some* concrete OrganizationPlanId
  * to type-check against.
  */
-export const plans: Record<PlanId, PlanConfig> = {
+export const organizationPlans: Record<OrganizationPlanId, OrganizationPlanConfig> = {
   free: { id: "free", name: "Free", seatLimit: 3, providerPriceId: null },
   starter: {
     id: "starter",
@@ -31,9 +31,9 @@ export const plans: Record<PlanId, PlanConfig> = {
 };
 
 /**
- * Individual (B2C) billing tiers — deliberately a separate map from `plans`, not a
+ * Individual (B2C) billing tiers — deliberately a separate map from `organizationPlans`, not a
  * variant of it. An individual isn't seat-based (no `seatLimit`/quantity concept),
- * so forcing it into `PlanConfig`'s shape would mean a meaningless field on one side
+ * so forcing it into `OrganizationPlanConfig`'s shape would mean a meaningless field on one side
  * or the other. See AGENTS.md's Billing model section for the organization-vs-individual split.
  */
 export type IndividualPlanId = "individual_free" | "individual_pro";
@@ -68,8 +68,8 @@ export interface CheckoutSessionResult {
  *
  * `checkout_completed` is a discriminated union on `ownerType` (not just `orgId`
  * widened to a generic id) because organization and individual checkouts resolve to
- * different plan maps (`PlanId` vs `IndividualPlanId`) — the handler branches on
- * `ownerType` to decide which table (`billing` vs `user_billing`) to write to, and
+ * different plan maps (`OrganizationPlanId` vs `IndividualPlanId`) — the handler branches on
+ * `ownerType` to decide which table (`organization_billing` vs `individual_billing`) to write to, and
  * TypeScript narrows `planId`'s type along with it.
  */
 export type BillingEvent =
@@ -79,7 +79,7 @@ export type BillingEvent =
       ownerId: string;
       providerCustomerId: string;
       providerSubscriptionId: string;
-      planId: PlanId;
+      planId: OrganizationPlanId;
     }
   | {
       type: "checkout_completed";
@@ -106,7 +106,7 @@ export type BillingEvent =
 export interface BillingGateway {
   createCheckoutSession(
     orgId: string,
-    planId: PlanId,
+    planId: OrganizationPlanId,
     quantity: number,
   ): Promise<CheckoutSessionResult>;
   /** Individual billing has no seat/quantity concept — always a quantity of one. */

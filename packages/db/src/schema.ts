@@ -148,7 +148,7 @@ export const organizationBilling = pgTable(
       .notNull()
       .unique()
       .references(() => organization.id, { onDelete: "cascade" }),
-    // Matches @repo/core's PlanId ("free" | "starter" | "growth"). Kept as free text,
+    // Matches @repo/core's OrganizationPlanId ("free" | "starter" | "growth"). Kept as free text,
     // not a DB enum, since packages/db can't import from packages/core (would create
     // a circular workspace dependency) — validated at the app boundary instead, same
     // trust model as `member.role` above.
