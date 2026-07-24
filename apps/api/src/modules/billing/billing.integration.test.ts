@@ -7,9 +7,12 @@ import {
   organization as organizationTable,
   user as userTable,
   billing as billingTable,
+  withOrgScope,
+  withSystemScope,
 } from "@repo/db";
 import { auth } from "@repo/core/auth";
 import { app } from "../../app";
+import { ensureBillingRow } from "./billing.db";
 
 // Hits the real dev database, same as the WS integration test — see PROGRESS.md. The
 // checkout-success case also hits the real Stripe test-mode API (skipped if no price is
@@ -77,7 +80,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.delete(billingTable).where(eq(billingTable.organizationId, orgId));
+  await withSystemScope((tx) =>
+    tx.delete(billingTable).where(eq(billingTable.organizationId, orgId)),
+  );
   await db.delete(organizationTable).where(eq(organizationTable.id, orgId));
   await db.delete(userTable).where(eq(userTable.id, ownerId));
   await db.delete(userTable).where(eq(userTable.id, memberId));
@@ -206,13 +211,38 @@ describe("POST /billing/webhook", () => {
     });
     expect(res.status).toBe(200);
 
-    const [row] = await db
-      .select()
-      .from(billingTable)
-      .where(eq(billingTable.organizationId, orgId));
+    const [row] = await withSystemScope((tx) =>
+      tx.select().from(billingTable).where(eq(billingTable.organizationId, orgId)),
+    );
     expect(row?.plan).toBe("starter");
     expect(row?.providerCustomerId).toBe("cus_test_fake");
     expect(row?.providerSubscriptionId).toBe("sub_test_fake");
     expect(row?.subscriptionStatus).toBe("active");
+  });
+});
+
+describe("Row-Level Security on the billing table", () => {
+  // Proves RLS is actually enforced, not just present — a policy alone is silently
+  // ineffective if the app's own DB role owns the table and FORCE ROW LEVEL SECURITY
+  // wasn't also set (Postgres exempts table owners from RLS by default). Self-contained
+  // (ensures its own row) rather than relying on an earlier test's side effect.
+  it("hides the row from an unscoped query, and from a different org's scope", async () => {
+    await withSystemScope((tx) => ensureBillingRow(tx, orgId));
+
+    const unscoped = await db
+      .select()
+      .from(billingTable)
+      .where(eq(billingTable.organizationId, orgId));
+    expect(unscoped).toEqual([]);
+
+    const wrongOrgScope = await withOrgScope("some-other-org-id", (tx) =>
+      tx.select().from(billingTable).where(eq(billingTable.organizationId, orgId)),
+    );
+    expect(wrongOrgScope).toEqual([]);
+
+    const rightOrgScope = await withOrgScope(orgId, (tx) =>
+      tx.select().from(billingTable).where(eq(billingTable.organizationId, orgId)),
+    );
+    expect(rightOrgScope).toHaveLength(1);
   });
 });
