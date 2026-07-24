@@ -119,6 +119,10 @@ describe("POST /billing/individual-checkout", () => {
 
 describe("POST /billing/webhook (individual ownerType)", () => {
   it("creates/updates the individual_billing row from a signed checkout.session.completed event, without touching organization_billing", async () => {
+    // providerSubscriptionId is UNIQUE at the DB level — a fixed literal here would
+    // collide with a leftover row from a prior run whose afterAll didn't complete
+    // (e.g. the process got killed mid-suite), failing this test for an unrelated reason.
+    const subscriptionId = `sub_test_individual_fake_${Date.now()}`;
     const payload = JSON.stringify({
       id: "evt_test_individual_checkout_completed",
       object: "event",
@@ -129,7 +133,7 @@ describe("POST /billing/webhook (individual ownerType)", () => {
           object: "checkout.session",
           client_reference_id: userId,
           customer: "cus_test_individual_fake",
-          subscription: "sub_test_individual_fake",
+          subscription: subscriptionId,
           metadata: { ownerType: "individual", ownerId: userId, planId: "individual_pro" },
         },
       },
@@ -149,7 +153,7 @@ describe("POST /billing/webhook (individual ownerType)", () => {
     );
     expect(row?.plan).toBe("individual_pro");
     expect(row?.providerCustomerId).toBe("cus_test_individual_fake");
-    expect(row?.providerSubscriptionId).toBe("sub_test_individual_fake");
+    expect(row?.providerSubscriptionId).toBe(subscriptionId);
     expect(row?.subscriptionStatus).toBe("active");
 
     // Cross-contamination check: an individual checkout must never create/touch a row
@@ -159,7 +163,7 @@ describe("POST /billing/webhook (individual ownerType)", () => {
       tx
         .select()
         .from(organizationBilling)
-        .where(eq(organizationBilling.providerSubscriptionId, "sub_test_individual_fake")),
+        .where(eq(organizationBilling.providerSubscriptionId, subscriptionId)),
     );
     expect(orgRows).toEqual([]);
   });

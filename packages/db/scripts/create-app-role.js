@@ -18,7 +18,13 @@ await client.connect();
 
 // CREATE/ALTER ROLE don't support bind parameters ($1) for the PASSWORD clause (DDL,
 // not DML) — dollar-quoting is the safe way to inline an arbitrary literal instead of
-// string-concatenating it directly into the statement.
+// string-concatenating it directly into the statement. Guard against the one way this
+// could still go wrong: if the password itself ever contained the tag, the quote would
+// terminate early and the remainder would be parsed as SQL — reject that outright
+// rather than silently mis-executing DDL against the owner connection.
+if (password.includes("$pw$")) {
+  throw new Error('APP_ROLE_PASSWORD must not contain the literal substring "$pw$"');
+}
 const quotedPassword = `$pw$${password}$pw$`;
 const exists = await client.query("select 1 from pg_roles where rolname = 'app_user'");
 

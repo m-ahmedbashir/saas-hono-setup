@@ -43,6 +43,13 @@
       "when": 1784853955266,
       "tag": "0005_rename_billing_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784858239381,
+      "tag": "0006_bored_paibok",
+      "breakpoints": true
     }
   ]
 }

@@ -26,6 +26,11 @@ Two candidates were investigated and both filtered out as false positives (indep
 
 No new findings.
 
+**Both filtered candidates were closed anyway** as cheap defense-in-depth, since neither cost more than a few lines:
+
+1. `create-app-role.js` now rejects `APP_ROLE_PASSWORD` outright if it contains the literal dollar-quote tag (`$pw$`) before building the DDL string, instead of relying on that string never occurring in a trusted env var.
+2. `providerSubscriptionId` is now `UNIQUE` at the DB level on both `organization_billing` and `individual_billing` (migration `0006_bored_paibok.sql`), so `updateBillingBySubscriptionId`/`updateUserBillingBySubscriptionId` are guaranteed by the schema — not just by Stripe's behavior — to touch at most one row. Adding this surfaced a latent test-fragility risk: both integration test files used a hardcoded fake subscription id, which would collide with a leftover row from any prior run that crashed before its `afterAll` cleanup ran. Fixed by making both test payloads use a per-run unique id (`sub_test_fake_${Date.now()}` / `sub_test_individual_fake_${Date.now()}`).
+
 ## Billing module
 
 ### `POST /billing/checkout`

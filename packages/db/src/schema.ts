@@ -154,7 +154,12 @@ export const organizationBilling = pgTable(
     // trust model as `member.role` above.
     plan: text("plan").notNull().default("free"),
     providerCustomerId: text("provider_customer_id"),
-    providerSubscriptionId: text("provider_subscription_id"),
+    // Unique (not just indexed) as defense-in-depth: guarantees at the DB level that
+    // updateBillingBySubscriptionId's WHERE clause can only ever match one row, even
+    // though app-level reasoning already establishes Stripe subscription ids can't
+    // collide across rows in practice. NULL-safe — Postgres allows multiple NULLs in
+    // a UNIQUE column, which is what every not-yet-subscribed row has.
+    providerSubscriptionId: text("provider_subscription_id").unique(),
     // Matches @repo/core's SubscriptionStatus ("active" | "past_due" | "canceled" | "incomplete").
     subscriptionStatus: text("subscription_status"),
     seatQuantity: integer("seat_quantity"),
@@ -190,7 +195,8 @@ export const individualBilling = pgTable(
     // Matches @repo/core's IndividualPlanId ("individual_free" | "individual_pro").
     plan: text("plan").notNull().default("individual_free"),
     providerCustomerId: text("provider_customer_id"),
-    providerSubscriptionId: text("provider_subscription_id"),
+    // Unique as defense-in-depth — same reasoning as organizationBilling above.
+    providerSubscriptionId: text("provider_subscription_id").unique(),
     subscriptionStatus: text("subscription_status"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

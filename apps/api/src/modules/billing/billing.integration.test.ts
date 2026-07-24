@@ -186,6 +186,10 @@ describe("POST /billing/webhook", () => {
   });
 
   it("creates/updates the billing row from a signed checkout.session.completed event", async () => {
+    // providerSubscriptionId is UNIQUE at the DB level — a fixed literal here would
+    // collide with a leftover row from a prior run whose afterAll didn't complete
+    // (e.g. the process got killed mid-suite), failing this test for an unrelated reason.
+    const subscriptionId = `sub_test_fake_${Date.now()}`;
     const payload = JSON.stringify({
       id: "evt_test_checkout_completed",
       object: "event",
@@ -196,7 +200,7 @@ describe("POST /billing/webhook", () => {
           object: "checkout.session",
           client_reference_id: orgId,
           customer: "cus_test_fake",
-          subscription: "sub_test_fake",
+          subscription: subscriptionId,
           metadata: { ownerType: "organization", ownerId: orgId, planId: "starter" },
         },
       },
@@ -216,7 +220,7 @@ describe("POST /billing/webhook", () => {
     );
     expect(row?.plan).toBe("starter");
     expect(row?.providerCustomerId).toBe("cus_test_fake");
-    expect(row?.providerSubscriptionId).toBe("sub_test_fake");
+    expect(row?.providerSubscriptionId).toBe(subscriptionId);
     expect(row?.subscriptionStatus).toBe("active");
   });
 });
