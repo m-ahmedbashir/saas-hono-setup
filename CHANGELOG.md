@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.10.0] — 2026-07-25
+
+### Fixed
+
+- WebSocket dispatcher: a second connection for the same user (a second tab/device) used to silently overwrite the first's registration, and closing the _first_ connection then deleted the _second_'s still-open entry — a live socket left permanently unreachable. Reproduces with one user and two tabs; not a scale-only issue. Fixed with `Map<string, Set<WSContext>>` instead of one connection per user.
+- Postgres pool now has explicit, env-driven `max`/timeouts (`DB_POOL_MAX`/`DB_POOL_IDLE_TIMEOUT_MS`/`DB_POOL_CONNECTION_TIMEOUT_MS`) instead of node-postgres's defaults (`max: 10`, wait-forever connection timeout), plus a `pool.on("error", ...)` handler — an unhandled error on an idle pooled client otherwise crashes the whole process.
+- Added graceful shutdown on `SIGTERM`/`SIGINT` — drains in-flight requests and closes the DB pool before exit, instead of a deploy/scale-down signal killing the process mid-request.
+- Stripe checkout creation now accepts an optional `Idempotency-Key` request header, passed through to Stripe — protects against a retried checkout request minting a duplicate session, which the Stripe SDK's own auto-generated per-call key does not (it only protects the SDK's internal network-retry).
+
+### Changed — **breaking**
+
+- `NotificationDispatcher.removeClient` (`packages/core`) now takes `(userId, client)` instead of `(userId)` — required to distinguish which of a user's possibly-multiple live connections closed. Any custom `NotificationDispatcher` implementation needs updating.
+
 ## [0.9.0] — 2026-07-25
 
 ### Added

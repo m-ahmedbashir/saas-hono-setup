@@ -68,20 +68,22 @@ curl -X POST http://localhost:8787/api/auth/sign-up/email \
 
 See `.env.example` for the full list with comments. Summary:
 
-| Variable                                       | Purpose                                                                                                                    |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                 | Postgres connection string — owner role, used only for running migrations                                                  |
-| `APP_DATABASE_URL`                             | Postgres connection string — restricted role (no `BYPASSRLS`) the app uses for its own runtime queries, see `AGENTS.md`    |
-| `BETTER_AUTH_SECRET`                           | Session/token signing secret — generate with `npx auth secret`                                                             |
-| `BETTER_AUTH_URL`                              | Base URL this API is served from                                                                                           |
-| `PORT`                                         | Port `apps/api` listens on                                                                                                 |
-| `ALLOWED_ORIGINS`                              | Comma-separated origins allowed to call this API — drives both the Hono CORS middleware and Better Auth's own origin check |
-| `SENTRY_DSN`                                   | Optional. Sentry DSN for production error monitoring. Unset = Sentry is disabled entirely, no-op                           |
-| `STRIPE_SECRET_KEY`                            | Stripe secret key (test-mode key is fine for development)                                                                  |
-| `STRIPE_WEBHOOK_SECRET`                        | Signing secret for `/billing/webhook`, from the Stripe CLI or dashboard                                                    |
-| `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_GROWTH` | Stripe Price IDs backing the organization (seat-based) paid tiers                                                          |
-| `STRIPE_PRICE_INDIVIDUAL_PRO`                  | Stripe Price ID backing the individual (B2C) paid tier                                                                     |
-| `BILLING_CHECKOUT_RETURN_URL`                  | Where Stripe Checkout redirects back to after a session completes/cancels                                                  |
+| Variable                                                    | Purpose                                                                                                                    |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                              | Postgres connection string — owner role, used only for running migrations                                                  |
+| `APP_DATABASE_URL`                                          | Postgres connection string — restricted role (no `BYPASSRLS`) the app uses for its own runtime queries, see `AGENTS.md`    |
+| `DB_POOL_MAX`                                               | Optional. Max Postgres pool connections (default `20`) — size against your real Postgres connection limit for production   |
+| `DB_POOL_IDLE_TIMEOUT_MS` / `DB_POOL_CONNECTION_TIMEOUT_MS` | Optional. Pool idle/connection-wait timeouts in ms (defaults `30000`/`10000`)                                              |
+| `BETTER_AUTH_SECRET`                                        | Session/token signing secret — generate with `npx auth secret`                                                             |
+| `BETTER_AUTH_URL`                                           | Base URL this API is served from                                                                                           |
+| `PORT`                                                      | Port `apps/api` listens on                                                                                                 |
+| `ALLOWED_ORIGINS`                                           | Comma-separated origins allowed to call this API — drives both the Hono CORS middleware and Better Auth's own origin check |
+| `SENTRY_DSN`                                                | Optional. Sentry DSN for production error monitoring. Unset = Sentry is disabled entirely, no-op                           |
+| `STRIPE_SECRET_KEY`                                         | Stripe secret key (test-mode key is fine for development)                                                                  |
+| `STRIPE_WEBHOOK_SECRET`                                     | Signing secret for `/billing/webhook`, from the Stripe CLI or dashboard                                                    |
+| `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_GROWTH`              | Stripe Price IDs backing the organization (seat-based) paid tiers                                                          |
+| `STRIPE_PRICE_INDIVIDUAL_PRO`                               | Stripe Price ID backing the individual (B2C) paid tier                                                                     |
+| `BILLING_CHECKOUT_RETURN_URL`                               | Where Stripe Checkout redirects back to after a session completes/cancels                                                  |
 
 `.env.development` / `.env.test` are gitignored — they're for your local machine only. `NODE_ENV` itself is **not** set in any env file; each `apps/api` script sets it directly (`dev` → `development`, `start` → `production`, `test` → `test`) via `cross-env`, so it's always correct regardless of which command runs. Real production secrets should come from your hosting platform's env var injection at deploy time, never from a committed file.
 

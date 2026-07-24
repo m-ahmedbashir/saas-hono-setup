@@ -89,4 +89,36 @@ describe("WS auth guardrail on /ws/:userId", () => {
 
     ws!.close();
   });
+
+  it("keeps a second connection (e.g. a second tab) reachable after the first closes", async () => {
+    // Regression test for a real bug: the dispatcher used to key one WSContext per
+    // userId, so a second connection silently overwrote the first's registration, and
+    // closing the *first* connection then deleted the *second*'s still-open entry —
+    // leaving a live socket that would never receive anything again.
+    const first = await attemptConnection(userId);
+    const second = await attemptConnection(userId);
+    expect(first.ws).toBeDefined();
+    expect(second.ws).toBeDefined();
+
+    await new Promise<void>((resolve) => {
+      first.ws!.once("close", () => resolve());
+      first.ws!.close();
+    });
+
+    const messageReceived = new Promise((resolve) => {
+      second.ws!.once("message", (data) => resolve(JSON.parse(data.toString())));
+    });
+
+    await notificationDispatcher.send(userId, {
+      title: "Still here",
+      body: "The second connection should still get this.",
+    });
+
+    await expect(messageReceived).resolves.toEqual({
+      title: "Still here",
+      body: "The second connection should still get this.",
+    });
+
+    second.ws!.close();
+  });
 });
