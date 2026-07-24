@@ -5,6 +5,7 @@ import {
   timestamp,
   boolean,
   integer,
+  date,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -210,6 +211,47 @@ export const individualBilling = pgTable(
 export const individualBillingRelations = relations(individualBilling, ({ one }) => ({
   user: one(user, {
     fields: [individualBilling.userId],
+    references: [user.id],
+  }),
+}));
+
+// Not a Better Auth-generated table — hand-written, own table rather than columns on
+// `user` for the same reason as organizationBilling/individualBilling: `user` is
+// generated and would drift on the next `@better-auth/cli generate` run. One row per
+// user regardless of B2C/B2B2C — a phone number or address is a person's, not an org's.
+// Address is structured (not a single free-text column) so it's usable for
+// shipping/tax/filtering later; `addressCountry` is validated as an ISO 3166-1 alpha-2
+// code at the app boundary (packages/db can't import Zod validators — see plan/free-text
+// reasoning on organizationBilling's `plan` column above).
+export const profile = pgTable(
+  "profile",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .unique()
+      .references(() => user.id, { onDelete: "cascade" }),
+    phone: text("phone"),
+    // Stored as a date of birth, not a raw age — an age goes stale the moment a year
+    // passes; dateOfBirth is the actual source of truth, age is derived when needed.
+    dateOfBirth: date("date_of_birth", { mode: "date" }),
+    addressStreet: text("address_street"),
+    addressCity: text("address_city"),
+    addressState: text("address_state"),
+    addressPostalCode: text("address_postal_code"),
+    addressCountry: text("address_country"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("profile_userId_idx").on(table.userId)],
+);
+
+export const profileRelations = relations(profile, ({ one }) => ({
+  user: one(user, {
+    fields: [profile.userId],
     references: [user.id],
   }),
 }));

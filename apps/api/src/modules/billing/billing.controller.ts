@@ -1,22 +1,10 @@
 import type { Context } from "hono";
 import { requireOrgContext } from "../../middleware/auth.middleware";
 import { success } from "../../lib/response";
+import type { ValidatedJsonContext } from "../../lib/validated-context";
 import { billingService } from "./stripe-billing.service";
 import { processWebhook } from "./billing.handlers";
 import type { checkoutRequestSchema, individualCheckoutRequestSchema } from "./billing.schema";
-import type { z } from "zod";
-
-// Reconstructs the exact `{ in, out }` shape @hono/zod-validator's zValidator produces
-// for a given schema on the "json" target (see its DefaultInput type) — needed because
-// pulling a handler out of the same .post(path, validator, handler) chain it's validated
-// in loses TypeScript's contextual inference for c.req.valid(); a plain `Context` types
-// .valid() as unusable. Keeps the validator itself in billing.routes.ts, per AGENTS.md.
-type ValidatedJsonContext<Schema extends z.ZodType> = Context<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  any,
-  string,
-  { in: { json: z.input<Schema> }; out: { json: z.output<Schema> } }
->;
 
 export async function organizationCheckoutHandler(
   c: ValidatedJsonContext<typeof checkoutRequestSchema>,

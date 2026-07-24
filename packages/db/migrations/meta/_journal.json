@@ -50,6 +50,20 @@
       "when": 1784858239381,
       "tag": "0006_bored_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784922656214,
+      "tag": "0007_amazing_phil_sheldon",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784922679838,
+      "tag": "0008_profile_rls",
+      "breakpoints": true
     }
   ]
 }

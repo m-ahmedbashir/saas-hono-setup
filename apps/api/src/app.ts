@@ -7,6 +7,8 @@ import { bodyLimit } from "hono/body-limit";
 import { etag } from "hono/etag";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { billingRoutes } from "./modules/billing/billing.routes";
+import { profileRoutes } from "./modules/profile/profile.routes";
+import { accountRoutes } from "./modules/account/account.routes";
 import { createNotificationsRoutes } from "./modules/notifications/notifications.routes";
 import { allowedOrigins } from "./lib/allowed-origins";
 import { failure } from "./lib/response";
@@ -41,7 +43,9 @@ export const app = new Hono()
   .use("*", etag())
   .get("/health", healthCheckHandler)
   .route("/api/auth", authRoutes)
-  .route("/billing", billingRoutes);
+  .route("/billing", billingRoutes)
+  .route("/profile", profileRoutes)
+  .route("/account", accountRoutes);
 
 export const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 

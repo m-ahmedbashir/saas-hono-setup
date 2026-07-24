@@ -20,10 +20,18 @@ const pool = new Pool({
 
 export const db = drizzle(pool, { schema });
 export * from "./schema";
-export { eq, count } from "drizzle-orm";
+export { eq, and, count } from "drizzle-orm";
 
 /** Whatever `db.transaction`'s callback receives — a `db`-shaped executor, scoped to one transaction. */
 export type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Either the plain `db` client or a `DbExecutor` — for `.db.ts` functions querying a
+ * table with no RLS policy at all (e.g. `member`/`organization`/`user`), where there's
+ * no scope to get wrong either way. RLS-enabled tables should keep requiring the
+ * stricter `DbExecutor` so a caller can't accidentally query them unscoped.
+ */
+export type AnyExecutor = typeof db | DbExecutor;
 
 /**
  * Runs `callback` inside a transaction scoped to one organization's Row-Level

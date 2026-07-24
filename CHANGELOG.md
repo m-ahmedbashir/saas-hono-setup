@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.8.0] — 2026-07-24
+
+### Added
+
+- `DELETE /account` — permanent, self-service account deletion. Blocks (422) if the caller is the sole owner of an organization that still has other members; deletes a solo-owned organization along with the account otherwise. Best-effort cancels any live Stripe subscription first. See `AGENTS.md`'s "Account deletion" section.
+
+### Fixed
+
+- Discovered and fixed a real bug while building account deletion: `ON DELETE CASCADE` through a `FORCE ROW LEVEL SECURITY`-protected table runs unscoped and gets blocked by the fail-closed policy, turning a clean delete into a foreign-key-violation error. RLS-protected rows (`profile`, `individual_billing`, `organization_billing`) are now explicitly deleted through the existing scoped helpers before their parent row, instead of relying on cascade.
+
+## [0.7.0] — 2026-07-24
+
+### Added
+
+- User profile: `phone`, `dateOfBirth`, and a structured address, `GET`/`PATCH /profile` — a new `profile` table (RLS-enabled, FK'd to `user.id`), ownership-scoped for both B2C and B2B2C. `PATCH` is a real partial update (omitted field = unchanged, explicit `null` = cleared). See `AGENTS.md`'s "User Profile" section.
+
+### Changed
+
+- Route handler discipline tightened repo-wide: every route handler (including `app.ts`'s `/health`/`notFound`/`onError`) is now a named function in a `.controller.ts`/`lib/app-handlers.ts`, never an inline closure in `.routes.ts`/`app.ts` — no behavior change, pure refactor. See `AGENTS.md`'s rewritten route handler discipline rule.
+
 ## [0.6.0] — 2026-07-24
 
 ### Added
