@@ -64,6 +64,20 @@
       "when": 1784922679838,
       "tag": "0008_profile_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784932197770,
+      "tag": "0009_smart_nightshade",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784932208786,
+      "tag": "0010_organization_profile_rls",
+      "breakpoints": true
     }
   ]
 }

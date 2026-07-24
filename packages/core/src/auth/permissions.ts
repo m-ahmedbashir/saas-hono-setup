@@ -4,6 +4,7 @@ export const statement = {
   progress: ["read", "write"],
   exercise: ["create", "read", "update", "delete"],
   billing: ["manage"],
+  organizationProfile: ["manage"],
 } as const;
 
 export const accessControl = createAccessControl(statement);
@@ -17,6 +18,7 @@ export const adminRole = accessControl.newRole({
   progress: ["read", "write"],
   exercise: ["create", "read", "update", "delete"],
   billing: ["manage"],
+  organizationProfile: ["manage"],
 });
 
 /**
@@ -29,4 +31,5 @@ export const ownerRole = accessControl.newRole({
   progress: ["read", "write"],
   exercise: ["create", "read", "update", "delete"],
   billing: ["manage"],
+  organizationProfile: ["manage"],
 });

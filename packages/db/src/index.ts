@@ -20,6 +20,7 @@ const pool = new Pool({
 
 export const db = drizzle(pool, { schema });
 export * from "./schema";
+export * from "./organization-profile";
 export { eq, and, count } from "drizzle-orm";
 
 /** Whatever `db.transaction`'s callback receives — a `db`-shaped executor, scoped to one transaction. */

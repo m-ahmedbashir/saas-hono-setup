@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.9.0] — 2026-07-25
+
+### Added
+
+- Organization profile: industry, company size, website, phone, tax ID, description, structured address, and `orgNumber` — a permanent, human-friendly, unique, indexed org identifier (not a join/invite credential — see `AGENTS.md`). `GET`/`PATCH /organization-profile`, RLS-enabled, owner/admin-only edits via a new `organizationProfile: ["manage"]` permission. Unlike every other table in this app, the profile row is created eagerly at org creation (a real, verified Better Auth `afterCreateOrganization` hook), not lazily on first access. See `AGENTS.md`'s "Organization Profile" section.
+
 ## [0.8.0] — 2026-07-24
 
 ### Added
