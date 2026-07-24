@@ -1,5 +1,5 @@
 import { createMiddleware } from "hono/factory";
-import { db, member, eq, count } from "@repo/db";
+import { member, eq, count, withOrgScope } from "@repo/db";
 import { AppError, plans, type PlanId } from "@repo/core";
 import { getBillingByOrgId } from "../modules/billing/billing.db";
 
@@ -24,16 +24,22 @@ export const enforceSeatLimit = createMiddleware(async (c, next) => {
     return;
   }
 
-  const billingRow = await getBillingByOrgId(userContext.organizationId);
-  const planId: PlanId = (billingRow?.plan as PlanId | undefined) ?? "free";
+  const organizationId = userContext.organizationId;
+  const { planId, activeMembers } = await withOrgScope(organizationId, async (tx) => {
+    const billingRow = await getBillingByOrgId(tx, organizationId);
+    const [row] = await tx
+      .select({ activeMembers: count() })
+      .from(member)
+      .where(eq(member.organizationId, organizationId));
+
+    return {
+      planId: (billingRow?.plan as PlanId | undefined) ?? "free",
+      activeMembers: row?.activeMembers ?? 0,
+    };
+  });
   const seatLimit = plans[planId].seatLimit;
 
-  const [row] = await db
-    .select({ activeMembers: count() })
-    .from(member)
-    .where(eq(member.organizationId, userContext.organizationId));
-
-  if ((row?.activeMembers ?? 0) >= seatLimit) {
+  if (activeMembers >= seatLimit) {
     throw new AppError(
       "PAYMENT_REQUIRED",
       `Seat limit reached for the "${planId}" plan (${seatLimit} seats)`,

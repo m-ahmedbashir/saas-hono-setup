@@ -7,7 +7,10 @@
       "Bash(node -e \"console.log\\(require.resolve\\('ws'\\)\\)\")",
       "Bash(node -e \"console.log\\(typeof WebSocket\\); console.log\\(WebSocket.toString\\(\\).slice\\(0, 200\\)\\)\")",
       "Bash(pnpm --filter @repo/api add stripe)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(pnpm --filter @repo/db --filter @repo/api typecheck)",
+      "Bash(pnpm db:migrate)",
+      "Bash(node --env-file=../../.env.development -e ' *)"
     ]
   }
 }

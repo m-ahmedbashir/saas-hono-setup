@@ -70,7 +70,8 @@ See `.env.example` for the full list with comments. Summary:
 
 | Variable                                       | Purpose                                                                                                                    |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                 | Postgres connection string                                                                                                 |
+| `DATABASE_URL`                                 | Postgres connection string — owner role, used only for running migrations                                                  |
+| `APP_DATABASE_URL`                             | Postgres connection string — restricted role (no `BYPASSRLS`) the app uses for its own runtime queries, see `AGENTS.md`    |
 | `BETTER_AUTH_SECRET`                           | Session/token signing secret — generate with `npx auth secret`                                                             |
 | `BETTER_AUTH_URL`                              | Base URL this API is served from                                                                                           |
 | `PORT`                                         | Port `apps/api` listens on                                                                                                 |
