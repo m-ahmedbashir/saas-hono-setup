@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { member, eq, count, withOrgScope } from "@repo/db";
-import { AppError, plans, type PlanId } from "@repo/core";
-import { getBillingByOrgId } from "../modules/billing/billing.db";
+import { AppError, organizationPlans, type OrganizationPlanId } from "@repo/core";
+import { getBillingByOrgId } from "../modules/billing/organization-billing.db";
 
 /**
  * Blocks an org-scoped action once active member count reaches the org's
@@ -33,11 +33,11 @@ export const enforceSeatLimit = createMiddleware(async (c, next) => {
       .where(eq(member.organizationId, organizationId));
 
     return {
-      planId: (billingRow?.plan as PlanId | undefined) ?? "free",
+      planId: (billingRow?.plan as OrganizationPlanId | undefined) ?? "free",
       activeMembers: row?.activeMembers ?? 0,
     };
   });
-  const seatLimit = plans[planId].seatLimit;
+  const seatLimit = organizationPlans[planId].seatLimit;
 
   if (activeMembers >= seatLimit) {
     throw new AppError(

@@ -2,6 +2,49 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.8.0] — 2026-07-24
+
+### Added
+
+- `DELETE /account` — permanent, self-service account deletion. Blocks (422) if the caller is the sole owner of an organization that still has other members; deletes a solo-owned organization along with the account otherwise. Best-effort cancels any live Stripe subscription first. See `AGENTS.md`'s "Account deletion" section.
+
+### Fixed
+
+- Discovered and fixed a real bug while building account deletion: `ON DELETE CASCADE` through a `FORCE ROW LEVEL SECURITY`-protected table runs unscoped and gets blocked by the fail-closed policy, turning a clean delete into a foreign-key-violation error. RLS-protected rows (`profile`, `individual_billing`, `organization_billing`) are now explicitly deleted through the existing scoped helpers before their parent row, instead of relying on cascade.
+
+## [0.7.0] — 2026-07-24
+
+### Added
+
+- User profile: `phone`, `dateOfBirth`, and a structured address, `GET`/`PATCH /profile` — a new `profile` table (RLS-enabled, FK'd to `user.id`), ownership-scoped for both B2C and B2B2C. `PATCH` is a real partial update (omitted field = unchanged, explicit `null` = cleared). See `AGENTS.md`'s "User Profile" section.
+
+### Changed
+
+- Route handler discipline tightened repo-wide: every route handler (including `app.ts`'s `/health`/`notFound`/`onError`) is now a named function in a `.controller.ts`/`lib/app-handlers.ts`, never an inline closure in `.routes.ts`/`app.ts` — no behavior change, pure refactor. See `AGENTS.md`'s rewritten route handler discipline rule.
+
+## [0.6.0] — 2026-07-24
+
+### Added
+
+- In-house feature entitlement system for gating routes/capabilities behind a subscription plan, zero external dependencies — `PlanEntitlements`/`BillingOwner`/`canAccessFeature`/`getPlanLimit` (`packages/core/src/billing/entitlements.ts`), and one `requireFeature(feature, scope)` Hono middleware (`apps/api/src/middleware/entitlement.middleware.ts`) covering both organization and individual billing. `scope` is a required argument, never inferred from session mode — see `ENTITLEMENTS.md` for the full design and why that matters.
+
+## [0.5.0] — 2026-07-24
+
+### Added
+
+- Individual (B2C) Stripe billing, alongside existing organization billing — a separate `individual_billing` table (FK'd to `user.id`, no seat concept, own `individualPlans` tier map), `POST /billing/individual-checkout` (ownership-scoped via `injectUserContext` only, works for any session with a user), and `createIndividualCheckoutSession` on `BillingGateway`. The shared `POST /billing/webhook` normalizes into a `BillingEvent` discriminated on `ownerType: "organization" | "individual"` and routes to the correct table — see `AGENTS.md`'s Billing model section.
+- Row-Level Security on `individual_billing` too, via a new `withUserScope` helper alongside the existing `withOrgScope`/`withSystemScope` — same pattern, same real proof test (`individual-billing.integration.test.ts`), including a dedicated check that an individual checkout's webhook event never writes to `organization_billing`.
+
+### Changed — **breaking**
+
+- `POST /billing/checkout` renamed to `POST /billing/organization-checkout`, now that there are two checkout flows and the old name was ambiguous.
+- Database tables renamed (data-preserving `RENAME TO`, not drop+recreate): `billing` → `organization_billing`, `user_billing` → `individual_billing`. Anyone with an existing deployment on `0.4.0` needs to run the new `0005_rename_billing_tables.sql` migration.
+
+### Fixed
+
+- `providerSubscriptionId` is now `UNIQUE` on both `organization_billing` and `individual_billing` (migration `0006_bored_paibok.sql`), closing a defense-in-depth gap flagged (but filtered as non-exploitable) by `/security-review` — see `SECURITY_AUDIT.md`.
+- `create-app-role.js` now rejects an `APP_ROLE_PASSWORD` containing its own dollar-quote tag instead of relying on that never happening.
+
 ## [0.4.0] — 2026-07-24
 
 ### Added

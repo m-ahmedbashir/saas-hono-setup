@@ -5,6 +5,7 @@ import {
   timestamp,
   boolean,
   integer,
+  date,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -140,21 +141,26 @@ export const invitation = pgTable(
 // migrated normally via drizzle-kit. FK'd to `organization.id` rather than adding
 // columns to `organization` itself, since that table IS generated and would drift
 // on the next `@better-auth/cli generate` run. See AGENTS.md's billing section.
-export const billing = pgTable(
-  "billing",
+export const organizationBilling = pgTable(
+  "organization_billing",
   {
     id: text("id").primaryKey(),
     organizationId: text("organization_id")
       .notNull()
       .unique()
       .references(() => organization.id, { onDelete: "cascade" }),
-    // Matches @repo/core's PlanId ("free" | "starter" | "growth"). Kept as free text,
+    // Matches @repo/core's OrganizationPlanId ("free" | "starter" | "growth"). Kept as free text,
     // not a DB enum, since packages/db can't import from packages/core (would create
     // a circular workspace dependency) — validated at the app boundary instead, same
     // trust model as `member.role` above.
     plan: text("plan").notNull().default("free"),
     providerCustomerId: text("provider_customer_id"),
-    providerSubscriptionId: text("provider_subscription_id"),
+    // Unique (not just indexed) as defense-in-depth: guarantees at the DB level that
+    // updateBillingBySubscriptionId's WHERE clause can only ever match one row, even
+    // though app-level reasoning already establishes Stripe subscription ids can't
+    // collide across rows in practice. NULL-safe — Postgres allows multiple NULLs in
+    // a UNIQUE column, which is what every not-yet-subscribed row has.
+    providerSubscriptionId: text("provider_subscription_id").unique(),
     // Matches @repo/core's SubscriptionStatus ("active" | "past_due" | "canceled" | "incomplete").
     subscriptionStatus: text("subscription_status"),
     seatQuantity: integer("seat_quantity"),
@@ -164,13 +170,89 @@ export const billing = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("billing_organizationId_idx").on(table.organizationId)],
+  (table) => [index("organization_billing_organizationId_idx").on(table.organizationId)],
 );
 
-export const billingRelations = relations(billing, ({ one }) => ({
+export const organizationBillingRelations = relations(organizationBilling, ({ one }) => ({
   organization: one(organization, {
-    fields: [billing.organizationId],
+    fields: [organizationBilling.organizationId],
     references: [organization.id],
+  }),
+}));
+
+// Individual (B2C) billing — a separate table from `organizationBilling`, not a
+// nullable-fields variant of it. No seat/quantity concept for an individual, so
+// reusing that shape would mean a meaningless `seatQuantity` on every row. FK'd to
+// `user.id`, same "own table, not columns on the generated table" reasoning as
+// `organizationBilling` vs `organization`. See AGENTS.md's Billing model section.
+export const individualBilling = pgTable(
+  "individual_billing",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .unique()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Matches @repo/core's IndividualPlanId ("individual_free" | "individual_pro").
+    plan: text("plan").notNull().default("individual_free"),
+    providerCustomerId: text("provider_customer_id"),
+    // Unique as defense-in-depth — same reasoning as organizationBilling above.
+    providerSubscriptionId: text("provider_subscription_id").unique(),
+    subscriptionStatus: text("subscription_status"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("individual_billing_userId_idx").on(table.userId)],
+);
+
+export const individualBillingRelations = relations(individualBilling, ({ one }) => ({
+  user: one(user, {
+    fields: [individualBilling.userId],
+    references: [user.id],
+  }),
+}));
+
+// Not a Better Auth-generated table — hand-written, own table rather than columns on
+// `user` for the same reason as organizationBilling/individualBilling: `user` is
+// generated and would drift on the next `@better-auth/cli generate` run. One row per
+// user regardless of B2C/B2B2C — a phone number or address is a person's, not an org's.
+// Address is structured (not a single free-text column) so it's usable for
+// shipping/tax/filtering later; `addressCountry` is validated as an ISO 3166-1 alpha-2
+// code at the app boundary (packages/db can't import Zod validators — see plan/free-text
+// reasoning on organizationBilling's `plan` column above).
+export const profile = pgTable(
+  "profile",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .unique()
+      .references(() => user.id, { onDelete: "cascade" }),
+    phone: text("phone"),
+    // Stored as a date of birth, not a raw age — an age goes stale the moment a year
+    // passes; dateOfBirth is the actual source of truth, age is derived when needed.
+    dateOfBirth: date("date_of_birth", { mode: "date" }),
+    addressStreet: text("address_street"),
+    addressCity: text("address_city"),
+    addressState: text("address_state"),
+    addressPostalCode: text("address_postal_code"),
+    addressCountry: text("address_country"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("profile_userId_idx").on(table.userId)],
+);
+
+export const profileRelations = relations(profile, ({ one }) => ({
+  user: one(user, {
+    fields: [profile.userId],
+    references: [user.id],
   }),
 }));
 

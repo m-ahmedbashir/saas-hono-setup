@@ -20,10 +20,18 @@ const pool = new Pool({
 
 export const db = drizzle(pool, { schema });
 export * from "./schema";
-export { eq, count } from "drizzle-orm";
+export { eq, and, count } from "drizzle-orm";
 
 /** Whatever `db.transaction`'s callback receives — a `db`-shaped executor, scoped to one transaction. */
 export type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Either the plain `db` client or a `DbExecutor` — for `.db.ts` functions querying a
+ * table with no RLS policy at all (e.g. `member`/`organization`/`user`), where there's
+ * no scope to get wrong either way. RLS-enabled tables should keep requiring the
+ * stricter `DbExecutor` so a caller can't accidentally query them unscoped.
+ */
+export type AnyExecutor = typeof db | DbExecutor;
 
 /**
  * Runs `callback` inside a transaction scoped to one organization's Row-Level
@@ -42,6 +50,23 @@ export async function withOrgScope<T>(
 ): Promise<T> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select set_config('app.current_org_id', ${organizationId}, true)`);
+    return callback(tx);
+  });
+}
+
+/**
+ * Same as `withOrgScope`, scoped by `userId` instead — for tables owned by an
+ * individual rather than an organization (e.g. `user_billing`). Sets a *different*
+ * session variable (`app.current_user_id`), so a single transaction could in principle
+ * scope both if a query ever needed both an org and a user context — not currently
+ * used that way, but the two are deliberately independent settings, not one shared key.
+ */
+export async function withUserScope<T>(
+  userId: string,
+  callback: (tx: DbExecutor) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.current_user_id', ${userId}, true)`);
     return callback(tx);
   });
 }

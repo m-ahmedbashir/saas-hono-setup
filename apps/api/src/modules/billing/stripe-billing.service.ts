@@ -1,11 +1,13 @@
 import Stripe from "stripe";
 import {
   AppError,
-  plans,
+  organizationPlans,
+  individualPlans,
   type BillingEvent,
   type BillingGateway,
   type CheckoutSessionResult,
-  type PlanId,
+  type IndividualPlanId,
+  type OrganizationPlanId,
   type SubscriptionStatus,
 } from "@repo/core";
 
@@ -32,10 +34,10 @@ const checkoutReturnUrl =
 export class StripeBillingService implements BillingGateway {
   async createCheckoutSession(
     orgId: string,
-    planId: PlanId,
+    planId: OrganizationPlanId,
     quantity: number,
   ): Promise<CheckoutSessionResult> {
-    const plan = plans[planId];
+    const plan = organizationPlans[planId];
     if (!plan.providerPriceId) {
       throw new AppError("VALIDATION_ERROR", `Plan "${planId}" has no billable price configured`);
     }
@@ -46,7 +48,32 @@ export class StripeBillingService implements BillingGateway {
       line_items: [{ price: plan.providerPriceId, quantity }],
       success_url: `${checkoutReturnUrl}?checkout=success`,
       cancel_url: `${checkoutReturnUrl}?checkout=cancelled`,
-      metadata: { orgId, planId },
+      metadata: { ownerType: "organization", ownerId: orgId, planId },
+    });
+
+    if (!session.url) {
+      throw new AppError("INTERNAL_ERROR", "Stripe did not return a checkout URL");
+    }
+
+    return { checkoutUrl: session.url };
+  }
+
+  async createIndividualCheckoutSession(
+    userId: string,
+    planId: IndividualPlanId,
+  ): Promise<CheckoutSessionResult> {
+    const plan = individualPlans[planId];
+    if (!plan.providerPriceId) {
+      throw new AppError("VALIDATION_ERROR", `Plan "${planId}" has no billable price configured`);
+    }
+
+    const session = await getStripeClient().checkout.sessions.create({
+      mode: "subscription",
+      client_reference_id: userId,
+      line_items: [{ price: plan.providerPriceId, quantity: 1 }],
+      success_url: `${checkoutReturnUrl}?checkout=success`,
+      cancel_url: `${checkoutReturnUrl}?checkout=cancelled`,
+      metadata: { ownerType: "individual", ownerId: userId, planId },
     });
 
     if (!session.url) {
@@ -92,23 +119,31 @@ export class StripeBillingService implements BillingGateway {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        const orgId = session.client_reference_id;
-        const planId = session.metadata?.planId as PlanId | undefined;
+        const ownerId = session.client_reference_id;
+        const ownerType = session.metadata?.ownerType;
+        const planId = session.metadata?.planId;
         if (
-          !orgId ||
+          !ownerId ||
           !planId ||
           typeof session.customer !== "string" ||
           typeof session.subscription !== "string"
         ) {
           return null;
         }
-        return {
-          type: "checkout_completed",
-          orgId,
+
+        const shared = {
+          type: "checkout_completed" as const,
+          ownerId,
           providerCustomerId: session.customer,
           providerSubscriptionId: session.subscription,
-          planId,
         };
+        if (ownerType === "organization") {
+          return { ...shared, ownerType, planId: planId as OrganizationPlanId };
+        }
+        if (ownerType === "individual") {
+          return { ...shared, ownerType, planId: planId as IndividualPlanId };
+        }
+        return null;
       }
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;

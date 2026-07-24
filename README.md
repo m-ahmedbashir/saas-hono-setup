@@ -79,7 +79,8 @@ See `.env.example` for the full list with comments. Summary:
 | `SENTRY_DSN`                                   | Optional. Sentry DSN for production error monitoring. Unset = Sentry is disabled entirely, no-op                           |
 | `STRIPE_SECRET_KEY`                            | Stripe secret key (test-mode key is fine for development)                                                                  |
 | `STRIPE_WEBHOOK_SECRET`                        | Signing secret for `/billing/webhook`, from the Stripe CLI or dashboard                                                    |
-| `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_GROWTH` | Stripe Price IDs backing the paid tiers in `packages/core/src/billing/types.ts`                                            |
+| `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_GROWTH` | Stripe Price IDs backing the organization (seat-based) paid tiers                                                          |
+| `STRIPE_PRICE_INDIVIDUAL_PRO`                  | Stripe Price ID backing the individual (B2C) paid tier                                                                     |
 | `BILLING_CHECKOUT_RETURN_URL`                  | Where Stripe Checkout redirects back to after a session completes/cancels                                                  |
 
 `.env.development` / `.env.test` are gitignored — they're for your local machine only. `NODE_ENV` itself is **not** set in any env file; each `apps/api` script sets it directly (`dev` → `development`, `start` → `production`, `test` → `test`) via `cross-env`, so it's always correct regardless of which command runs. Real production secrets should come from your hosting platform's env var injection at deploy time, never from a committed file.
@@ -89,7 +90,7 @@ See `.env.example` for the full list with comments. Summary:
 ```
 apps/api/                  Hono server — the only deployable app right now
   src/index.ts              entrypoint: middleware chain, route composition, exports AppType for RPC clients
-  src/middleware/            injectUserContext (auth), requirePermission (PBAC)
+  src/middleware/            injectUserContext (auth), requirePermission (PBAC), requireFeature (plan entitlements)
   src/lib/                   response.ts — the API's success/error envelope
   src/modules/auth/          proxies to Better Auth's own handler
 

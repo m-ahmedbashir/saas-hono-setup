@@ -1,13 +1,17 @@
-import { billing, eq, type DbExecutor } from "@repo/db";
-import type { PlanId, SubscriptionStatus } from "@repo/core";
+import { organizationBilling, eq, type DbExecutor } from "@repo/db";
+import type { OrganizationPlanId, SubscriptionStatus } from "@repo/core";
 
 // Every function here requires an explicit `tx` — a `withOrgScope`/`withSystemScope`
 // transaction executor from @repo/db, never the bare `db` client — so it's impossible
-// to accidentally query the RLS-enabled `billing` table without deliberately choosing
-// which context it runs under. See AGENTS.md's Row-Level Security section.
+// to accidentally query the RLS-enabled `organization_billing` table without
+// deliberately choosing which context it runs under. See AGENTS.md's Row-Level
+// Security section.
 
 export async function getBillingByOrgId(tx: DbExecutor, organizationId: string) {
-  const [row] = await tx.select().from(billing).where(eq(billing.organizationId, organizationId));
+  const [row] = await tx
+    .select()
+    .from(organizationBilling)
+    .where(eq(organizationBilling.organizationId, organizationId));
   return row ?? null;
 }
 
@@ -17,14 +21,14 @@ export async function ensureBillingRow(tx: DbExecutor, organizationId: string) {
   if (existing) return existing;
 
   const [created] = await tx
-    .insert(billing)
+    .insert(organizationBilling)
     .values({ id: crypto.randomUUID(), organizationId })
     .returning();
   return created!;
 }
 
 interface BillingUpdate {
-  plan: PlanId;
+  plan: OrganizationPlanId;
   providerCustomerId: string;
   providerSubscriptionId: string;
   subscriptionStatus: SubscriptionStatus;
@@ -36,7 +40,10 @@ export async function updateBillingByOrgId(
   organizationId: string,
   values: Partial<BillingUpdate>,
 ) {
-  await tx.update(billing).set(values).where(eq(billing.organizationId, organizationId));
+  await tx
+    .update(organizationBilling)
+    .set(values)
+    .where(eq(organizationBilling.organizationId, organizationId));
 }
 
 export async function updateBillingBySubscriptionId(
@@ -45,7 +52,7 @@ export async function updateBillingBySubscriptionId(
   values: Partial<BillingUpdate>,
 ) {
   await tx
-    .update(billing)
+    .update(organizationBilling)
     .set(values)
-    .where(eq(billing.providerSubscriptionId, providerSubscriptionId));
+    .where(eq(organizationBilling.providerSubscriptionId, providerSubscriptionId));
 }

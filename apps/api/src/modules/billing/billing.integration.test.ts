@@ -6,13 +6,13 @@ import {
   eq,
   organization as organizationTable,
   user as userTable,
-  billing as billingTable,
+  organizationBilling as billingTable,
   withOrgScope,
   withSystemScope,
 } from "@repo/db";
 import { auth } from "@repo/core/auth";
 import { app } from "../../app";
-import { ensureBillingRow } from "./billing.db";
+import { ensureBillingRow } from "./organization-billing.db";
 
 // Hits the real dev database, same as the WS integration test — see PROGRESS.md. The
 // checkout-success case also hits the real Stripe test-mode API (skipped if no price is
@@ -89,9 +89,9 @@ afterAll(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-describe("POST /billing/checkout", () => {
+describe("POST /billing/organization-checkout", () => {
   it("rejects an unauthenticated request", async () => {
-    const res = await fetch(`http://localhost:${PORT}/billing/checkout`, {
+    const res = await fetch(`http://localhost:${PORT}/billing/organization-checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: ORIGIN },
       body: JSON.stringify({ planId: "starter", quantity: 1 }),
@@ -100,7 +100,7 @@ describe("POST /billing/checkout", () => {
   });
 
   it("rejects a member without billing:manage permission", async () => {
-    const res = await fetch(`http://localhost:${PORT}/billing/checkout`, {
+    const res = await fetch(`http://localhost:${PORT}/billing/organization-checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: memberCookie },
       body: JSON.stringify({ planId: "starter", quantity: 1 }),
@@ -109,7 +109,7 @@ describe("POST /billing/checkout", () => {
   });
 
   it("rejects a malformed body via the zValidator pre-route guard, in our envelope shape", async () => {
-    const res = await fetch(`http://localhost:${PORT}/billing/checkout`, {
+    const res = await fetch(`http://localhost:${PORT}/billing/organization-checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: ownerCookie },
       body: JSON.stringify({ planId: "not-a-real-plan", quantity: -5 }),
@@ -121,7 +121,7 @@ describe("POST /billing/checkout", () => {
   });
 
   it("rejects a plan with no billable price configured (free)", async () => {
-    const res = await fetch(`http://localhost:${PORT}/billing/checkout`, {
+    const res = await fetch(`http://localhost:${PORT}/billing/organization-checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: ownerCookie },
       body: JSON.stringify({ planId: "free", quantity: 1 }),
@@ -132,7 +132,7 @@ describe("POST /billing/checkout", () => {
   it.skipIf(!process.env.STRIPE_PRICE_STARTER)(
     "returns a real Stripe checkout URL for an owner on a billable plan",
     async () => {
-      const res = await fetch(`http://localhost:${PORT}/billing/checkout`, {
+      const res = await fetch(`http://localhost:${PORT}/billing/organization-checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: ownerCookie },
         body: JSON.stringify({ planId: "starter", quantity: 3 }),
@@ -186,6 +186,10 @@ describe("POST /billing/webhook", () => {
   });
 
   it("creates/updates the billing row from a signed checkout.session.completed event", async () => {
+    // providerSubscriptionId is UNIQUE at the DB level — a fixed literal here would
+    // collide with a leftover row from a prior run whose afterAll didn't complete
+    // (e.g. the process got killed mid-suite), failing this test for an unrelated reason.
+    const subscriptionId = `sub_test_fake_${Date.now()}`;
     const payload = JSON.stringify({
       id: "evt_test_checkout_completed",
       object: "event",
@@ -196,8 +200,8 @@ describe("POST /billing/webhook", () => {
           object: "checkout.session",
           client_reference_id: orgId,
           customer: "cus_test_fake",
-          subscription: "sub_test_fake",
-          metadata: { planId: "starter" },
+          subscription: subscriptionId,
+          metadata: { ownerType: "organization", ownerId: orgId, planId: "starter" },
         },
       },
     });
@@ -216,7 +220,7 @@ describe("POST /billing/webhook", () => {
     );
     expect(row?.plan).toBe("starter");
     expect(row?.providerCustomerId).toBe("cus_test_fake");
-    expect(row?.providerSubscriptionId).toBe("sub_test_fake");
+    expect(row?.providerSubscriptionId).toBe(subscriptionId);
     expect(row?.subscriptionStatus).toBe("active");
   });
 });
