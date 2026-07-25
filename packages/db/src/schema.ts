@@ -21,6 +21,15 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
+  // Platform-wide operator role (e.g. "admin"), added by the `admin` plugin
+  // (packages/core/src/auth/index.ts) — see AGENTS.md's Platform admin section. A
+  // different concept from `member.role` below: this is one flag on the account itself,
+  // not per-organization. Nullable/no default, matching the plugin's own generated shape
+  // — a normal user has no `role` value at all, not an explicit "user" string.
+  role: text("role"),
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
 });
 
 export const session = pgTable(
@@ -39,6 +48,10 @@ export const session = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     activeOrganizationId: text("active_organization_id"),
+    // Set on a session created via POST /api/auth/admin/impersonate-user — holds the
+    // impersonating admin's user id. Better Auth's own admin plugin filters sessions
+    // carrying this out of list-sessions responses; nothing in this app queries it directly.
+    impersonatedBy: text("impersonated_by"),
   },
   (table) => [index("session_userId_idx").on(table.userId)],
 );
