@@ -1,0 +1,24 @@
+# node_modules, .env*, *.tsbuildinfo etc. are already covered by the root .gitignore
+# (patterns with no leading slash there match at any depth). Only Next.js-specific
+# extras live here.
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# testing
+/coverage
+
+# misc
+.DS_Store
+*.pem
+next-env.d.ts
+
+# vercel
+.vercel
+
+# clerk configuration (can include secrets) — dead until Clerk is actually removed
+/.clerk/
