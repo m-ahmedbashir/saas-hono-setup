@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.13.0] — 2026-07-25
+
+### Added
+
+- `apps/web` — a Next.js 16 + shadcn/ui admin dashboard, vendored from [next-shadcn-dashboard-starter](https://github.com/Kiranism/next-shadcn-dashboard-starter) (MIT) and adapted into this monorepo: Clerk/Sentry/kanban/chat/demo-examples removed via the template's own cleanup tool, package renamed `@repo/web` and wired into the pnpm workspace (own `eslint.config.mjs` hand-built around `eslint-plugin-react`'s ESLint-10 incompatibility, `.gitignore` trimmed to what root doesn't already cover), Vitest + React Testing Library added for component tests. First real feature: `/auth/sign-in`, built test-first against Better Auth's own React client (`src/lib/auth-client.ts`) — no Next.js API-route proxy in between, straight `fetch` to `apps/api`. See `AGENTS.md`'s new "apps/web" section.
+
 ## [0.12.0] — 2026-07-25
 
 ### Added
