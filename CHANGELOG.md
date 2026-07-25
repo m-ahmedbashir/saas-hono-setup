@@ -2,6 +2,37 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.16.0] — 2026-07-25
+
+### Fixed
+
+- A Zod `.default()` on a field TanStack Form's `defaultValues` already supplies (`rememberMe`) was silently breaking `next build`'s type-check.
+- Shared `CheckboxField` label had no `htmlFor`, so clicking "Remember me"'s label text didn't toggle the checkbox — only the small checkbox itself did.
+
+### Changed
+
+- Icon-affordance and password-visibility-toggle support moved into the shared `TextField`/`FormTextField` (new optional `icon`/`labelSuffix` props) instead of living as feature-local duplicates in the sign-in form. Existing plain text fields elsewhere are unaffected (same markup as before). `sign-in-view.tsx` now composes only prebuilt field components.
+
+## [0.15.0] — 2026-07-25
+
+### Added
+
+- `apps/web/src/lib/api-client.ts` — shared `apiFetch<T>` for calling `apps/api`, replacing the template's original stub. Matches the real success/failure envelope, throws a typed `ApiError` (`code`/`message`/`status`) instead of a bare `Error`. Built test-first (`api-client.test.ts`).
+
+### Changed
+
+- Sign-in form (`/auth/sign-in`) redesigned: icon-affordance inputs, password show/hide toggle, autofocus/placeholder/autocomplete polish, loading-aware submit label, and a corrected mobile layout (the first pass's aesthetic redesign only showed at desktop width, leaving mobile as a bare, unstyled form).
+
+### Housekeeping
+
+- Mirrored a repo-root skill (`nextjs-shadcn-frontend`) from `.agents/skills/` into `.claude/skills/` — the latter is what this harness actually scans for slash-invokable skills; every other skill in the repo already existed in both.
+
+## [0.14.0] — 2026-07-25
+
+### Fixed
+
+- `apps/web`'s `src/proxy.ts` was a no-op left over from the Clerk removal — the dashboard was reachable with no login at all. Now redirects unauthenticated `/dashboard/**` requests to `/auth/sign-in` (and an authenticated session away from `/auth/**` to `/dashboard/overview`), via `getSessionCookie` (`better-auth/cookies`). Built test-first, `proxy.test.ts`. See `AGENTS.md`'s "apps/web" section — including a correction of a wrong claim in the `next-best-practices` skill about the config export name.
+
 ## [0.13.0] — 2026-07-25
 
 ### Added

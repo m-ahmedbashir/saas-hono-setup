@@ -26,6 +26,7 @@ export function CheckboxField({ label, description }: CheckboxFieldProps) {
     <FormFieldSet>
       <FormField orientation="horizontal">
         <Checkbox
+          id={field.name}
           checked={value}
           onCheckedChange={(checked) => {
             field.handleChange(checked as boolean);
@@ -34,7 +35,11 @@ export function CheckboxField({ label, description }: CheckboxFieldProps) {
           aria-invalid={isTouched && !isValid}
         />
         <div className="flex flex-1 flex-col gap-1.5 leading-snug">
-          <FieldLabel className="leading-none">{label}</FieldLabel>
+          {/* htmlFor makes the label text itself toggle the checkbox on click/tap —
+              missing before, so only the small checkbox hit target worked. */}
+          <FieldLabel htmlFor={field.name} className="leading-none">
+            {label}
+          </FieldLabel>
           {description && <FieldDescription>{description}</FieldDescription>}
           <FormFieldError />
         </div>

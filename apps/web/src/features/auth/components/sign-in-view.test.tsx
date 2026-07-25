@@ -23,16 +23,33 @@ describe("SignInView", () => {
 
   it("renders email and password fields", () => {
     render(<SignInView />);
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+  });
+
+  it("toggles the password field's visibility, and only that field's", async () => {
+    const user = userEvent.setup();
+    render(<SignInView />);
+
+    const password = screen.getByLabelText("Password");
+    expect(password).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: /show password/i }));
+
+    expect(password).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("Email")).toHaveAttribute("type", "email");
+
+    await user.click(screen.getByRole("button", { name: /hide password/i }));
+
+    expect(password).toHaveAttribute("type", "password");
   });
 
   it("shows a validation error for an invalid email and never calls the network", async () => {
     const user = userEvent.setup();
     render(<SignInView />);
 
-    await user.type(screen.getByLabelText(/email/i), "not-an-email");
-    await user.type(screen.getByLabelText(/password/i), "password1234");
+    await user.type(screen.getByLabelText("Email"), "not-an-email");
+    await user.type(screen.getByLabelText("Password"), "password1234");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(await screen.findByText(/valid email/i)).toBeInTheDocument();
@@ -44,8 +61,8 @@ describe("SignInView", () => {
     const user = userEvent.setup();
     render(<SignInView />);
 
-    await user.type(screen.getByLabelText(/email/i), "person@example.com");
-    await user.type(screen.getByLabelText(/password/i), "password1234");
+    await user.type(screen.getByLabelText("Email"), "person@example.com");
+    await user.type(screen.getByLabelText("Password"), "password1234");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() =>
@@ -60,8 +77,8 @@ describe("SignInView", () => {
     const user = userEvent.setup();
     render(<SignInView />);
 
-    await user.type(screen.getByLabelText(/email/i), "person@example.com");
-    await user.type(screen.getByLabelText(/password/i), "password1234");
+    await user.type(screen.getByLabelText("Email"), "person@example.com");
+    await user.type(screen.getByLabelText("Password"), "password1234");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/dashboard/overview"));
@@ -75,8 +92,8 @@ describe("SignInView", () => {
     const user = userEvent.setup();
     render(<SignInView />);
 
-    await user.type(screen.getByLabelText(/email/i), "person@example.com");
-    await user.type(screen.getByLabelText(/password/i), "wrong-password");
+    await user.type(screen.getByLabelText("Email"), "person@example.com");
+    await user.type(screen.getByLabelText("Password"), "wrong-password");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(await screen.findByText(/invalid email or password/i)).toBeInTheDocument();

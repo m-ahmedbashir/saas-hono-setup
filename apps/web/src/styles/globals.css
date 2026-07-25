@@ -80,6 +80,24 @@
    accordion keyframes only read the radix-era variable. Redefine them (later in
    the cascade, so these win) with a Base UI fallback so expand/collapse animates
    instead of snapping to `auto`. */
+/* Staggered page-load reveal (e.g. sign-in) — combined with an inline
+   `[animation-delay:Nms]` per element for one orchestrated entrance instead of
+   scattered per-element motion. */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @keyframes accordion-down {
   from {
     height: 0;
