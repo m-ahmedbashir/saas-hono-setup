@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.17.0] — 2026-07-25
+
+### Fixed
+
+- Shared `Form` component (`apps/web/src/components/ui/tanstack-form.tsx`) was silently discarding any custom `className` passed to it — `{...props}` spread after the merged `className`, and `className` was never excluded from `props`'s type, so React's prop resolution let the raw value win. Affected every form in the app; margin/gap utilities on any `form.Form` had zero effect.
+
+### Added
+
+- `pnpm --filter @repo/api seed:admin` (`apps/api/scripts/seed-admin.ts`) — idempotent platform-admin seeding from `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD`/`SEED_ADMIN_NAME`, an operator-friendly alternative to `ADMIN_USER_IDS`.
+
+### Verified
+
+- Sign-in flow confirmed working end-to-end against the real dev servers (not just the test suite): real sign-up/sign-in through the exact endpoints `authClient` uses, CORS genuinely exercised with a real `Origin` header, session cookie authenticates a real route, wrong password correctly rejected.
+
 ## [0.16.0] — 2026-07-25
 
 ### Fixed

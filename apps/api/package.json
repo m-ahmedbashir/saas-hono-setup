@@ -1,6 +1,6 @@
 {
   "name": "@repo/api",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,8 @@
     "test": "cross-env NODE_ENV=test vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "seed:admin": "tsx --env-file=../../.env.development scripts/seed-admin.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
