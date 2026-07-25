@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.12.0] — 2026-07-25
+
+### Added
+
+- Platform admin backend, via Better Auth's own `admin` plugin (`packages/core/src/auth/index.ts`) — no custom system, no UI yet. Adds `user.role`/`banned`/`banReason`/`banExpires` and `session.impersonatedBy` (migration `0011_uneven_rick_jones.sql`). Every `/api/auth/admin/**` endpoint (list/create/update users, set-role, ban/unban, impersonate, revoke sessions, etc.) is now live through the existing auth proxy. `ADMIN_USER_IDS` env var bootstraps the first admin. See `AGENTS.md`'s "Platform admin" section.
+
 ## [0.11.0] — 2026-07-25
 
 ### Added
