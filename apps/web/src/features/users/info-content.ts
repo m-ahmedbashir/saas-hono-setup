@@ -1,40 +1,24 @@
 import type { InfobarContent } from "@/components/ui/infobar";
 
 export const usersInfoContent: InfobarContent = {
-  title: "Users — React Query + nuqs Pattern",
+  title: "Platform Users",
   sections: [
     {
       title: "Overview",
       description:
-        "This page demonstrates client-side data fetching with React Query combined with nuqs URL search params — as an alternative to the Products page which uses server-side RSC fetching. Both patterns use the same DataTable, useDataTable hook, and nuqs URL state.",
-      links: [
-        {
-          title: "TanStack Query SSR Docs",
-          url: "https://tanstack.com/query/latest/docs/framework/react/guides/advanced-ssr",
-        },
-      ],
-    },
-    {
-      title: "Server Prefetch + Client Hydration",
-      description:
-        "The server component reads search params via searchParamsCache, builds filters, and calls queryClient.prefetchQuery(). The dehydrated state is passed to HydrationBoundary so the client starts with cached data. The client component reads the same search params via useQueryState and calls useSuspenseQuery with matching filters.",
+        "Manage the platform's own staff accounts — admins and support — as distinct from an organization's members. Employees don't self-signup: a platform admin creates their account here and shares the credentials directly. Employees can update their own profile details afterward, but account creation and role/access changes stay admin-controlled.",
       links: [],
     },
     {
-      title: "URL State with nuqs",
+      title: "Roles & permissions",
       description:
-        "Pagination, search, and role filters are synced to the URL via nuqs. The useDataTable hook manages the TanStack Table state and debounces filter changes before updating the URL. When the URL changes, React Query automatically refetches because the query key includes the filters.",
-      links: [
-        {
-          title: "nuqs Documentation",
-          url: "https://nuqs.47ng.com",
-        },
-      ],
+        "Admin: full platform access (create/list/ban/remove users, change roles, impersonate). Support: read-only (list/view users), for staff who need visibility without the ability to make changes. Roles can be changed at any time from each row's actions menu.",
+      links: [],
     },
     {
-      title: "Products vs Users Pattern",
+      title: "How this is enforced",
       description:
-        "Products: searchParams → RSC fetch → pass data as props to client table. Users: searchParams → server prefetch → HydrationBoundary → client useSuspenseQuery. The Users pattern enables background refetching, cache sharing across components, and optimistic mutations.",
+        "This page calls Better Auth's admin plugin directly (authClient.admin.*) — there's no separate app API for it. Every action is re-checked server-side against the same role/permission set shown here, so the access gate on this page is a UX convenience, not the security boundary.",
       links: [],
     },
   ],

@@ -7,44 +7,73 @@ import {
   DropdownMenuItem,
   DropdownMenuGroup,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { deleteUserMutation } from "../../api/mutations";
-import type { User } from "../../api/types";
+import {
+  setUserRoleMutation,
+  banUserMutation,
+  unbanUserMutation,
+  removeUserMutation,
+} from "../../api/mutations";
+import type { PlatformUser } from "../../api/types";
 import { Icons } from "@/components/icons";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { UserFormSheet } from "../user-form-sheet";
 
 interface CellActionProps {
-  data: User;
+  data: PlatformUser;
 }
 
 export function CellAction({ data }: CellActionProps) {
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [banOpen, setBanOpen] = useState(false);
 
-  const deleteMutation = useMutation({
-    ...deleteUserMutation,
+  const setRole = useMutation({
+    ...setUserRoleMutation,
+    onSuccess: () => toast.success(`Role updated for ${data.name}`),
+    onError: () => toast.error("Failed to update role"),
+  });
+
+  const ban = useMutation({
+    ...banUserMutation,
     onSuccess: () => {
-      toast.success("User deleted successfully");
-      setDeleteOpen(false);
+      toast.success(`${data.name} has been banned`);
+      setBanOpen(false);
     },
-    onError: () => {
-      toast.error("Failed to delete user");
+    onError: () => toast.error("Failed to ban user"),
+  });
+
+  const unban = useMutation({
+    ...unbanUserMutation,
+    onSuccess: () => toast.success(`${data.name} has been unbanned`),
+    onError: () => toast.error("Failed to unban user"),
+  });
+
+  const remove = useMutation({
+    ...removeUserMutation,
+    onSuccess: () => {
+      toast.success(`${data.name} has been removed`);
+      setRemoveOpen(false);
     },
+    onError: () => toast.error("Failed to remove user"),
   });
 
   return (
     <>
       <AlertModal
-        isOpen={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={() => deleteMutation.mutate(data.id)}
-        loading={deleteMutation.isPending}
+        isOpen={removeOpen}
+        onClose={() => setRemoveOpen(false)}
+        onConfirm={() => remove.mutate(data.id)}
+        loading={remove.isPending}
       />
-      <UserFormSheet user={data} open={editOpen} onOpenChange={setEditOpen} />
+      <AlertModal
+        isOpen={banOpen}
+        onClose={() => setBanOpen(false)}
+        onConfirm={() => ban.mutate({ userId: data.id })}
+        loading={ban.isPending}
+      />
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
           <span className="sr-only">Open menu</span>
@@ -52,14 +81,36 @@ export function CellAction({ data }: CellActionProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuLabel>Role</DropdownMenuLabel>
+            <DropdownMenuItem
+              disabled={data.role === "admin"}
+              onClick={() => setRole.mutate({ userId: data.id, role: "admin" })}
+            >
+              <Icons.pro className="mr-2 h-4 w-4" /> Make admin
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={data.role === "support"}
+              onClick={() => setRole.mutate({ userId: data.id, role: "support" })}
+            >
+              <Icons.user className="mr-2 h-4 w-4" /> Make support
+            </DropdownMenuItem>
           </DropdownMenuGroup>
-          <DropdownMenuItem onClick={() => setEditOpen(true)}>
-            <Icons.edit className="mr-2 h-4 w-4" /> Update
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setDeleteOpen(true)}>
-            <Icons.trash className="mr-2 h-4 w-4" /> Delete
-          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Access</DropdownMenuLabel>
+            {data.banned ? (
+              <DropdownMenuItem onClick={() => unban.mutate(data.id)}>
+                <Icons.circleCheck className="mr-2 h-4 w-4" /> Unban
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => setBanOpen(true)}>
+                <Icons.circleX className="mr-2 h-4 w-4" /> Ban
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={() => setRemoveOpen(true)}>
+              <Icons.trash className="mr-2 h-4 w-4" /> Remove
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </>

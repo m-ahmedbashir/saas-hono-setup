@@ -1,8 +1,7 @@
+// Matches packages/core/src/auth/platform-permissions.ts's two platform tiers exactly —
+// not the org-level roles from packages/core/src/auth/permissions.ts, a different,
+// unrelated concept (see AGENTS.md's Platform admin section).
 export const ROLE_OPTIONS = [
-  { value: "Developer", label: "Developer" },
-  { value: "Designer", label: "Designer" },
-  { value: "Manager", label: "Manager" },
-  { value: "QA", label: "QA" },
-  { value: "DevOps", label: "DevOps" },
-  { value: "Product Owner", label: "Product Owner" },
+  { value: "admin", label: "Admin" },
+  { value: "support", label: "Support" },
 ];

@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.18.0] — 2026-07-25
+
+### Added
+
+- Platform employees feature — a platform admin can now add other staff directly (`authClient.admin.createUser`, no self-signup/invite-email flow), assign one of two roles (`admin`, `support`), and change role/ban/unban/remove from `apps/web`'s `/dashboard/users` page. Two platform roles now exist: `admin` (full access, identical to Better Auth's own default admin permissions) and `support` (read-only — list/view users only). Page is gated client-side to these two roles via `PlatformAccessGate`; the real enforcement stays server-side on every `authClient.admin.*` call.
+
+### Changed
+
+- `packages/core/src/auth/index.ts`'s `admin` plugin config now passes a custom `roles`/`ac` (`platform-permissions.ts`) instead of relying on the plugin's built-in defaults — required to add the `support` tier. Verified this exactly replicates the existing default admin role's permissions so the already-bootstrapped admin account keeps identical access, not a silent downgrade.
+- `apps/web`'s `/dashboard/users` (`src/features/users/`) fully replaced the template's fake in-memory user data with real `authClient.admin.*` calls. Deleted the now-dead `app/api/users/**` route handlers; `src/constants/mock-api-users.ts` now only exports `delay` (still used by the overview dashboard's mock chart pages).
+
 ## [0.17.0] — 2026-07-25
 
 ### Fixed

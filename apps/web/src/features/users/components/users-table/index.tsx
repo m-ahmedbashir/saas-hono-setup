@@ -20,17 +20,20 @@ export function UsersTable() {
     sort: getSortingStateParser(columnIds).withDefault([]),
   });
 
+  const firstSort = params.sort[0];
+
   const filters = {
     page: params.page,
     limit: params.perPage,
     ...(params.name && { search: params.name }),
-    ...(params.role && { roles: params.role }),
-    ...(params.sort.length > 0 && { sort: JSON.stringify(params.sort) }),
+    ...(params.role && { role: params.role }),
+    ...(firstSort &&
+      ({ sortBy: firstSort.id, sortDirection: firstSort.desc ? "desc" : "asc" } as const)),
   };
 
   const { data } = useSuspenseQuery(usersQueryOptions(filters));
 
-  const pageCount = Math.ceil(data.total_users / params.perPage);
+  const pageCount = Math.ceil(data.total / params.perPage);
 
   const { table } = useDataTable({
     data: data.users,

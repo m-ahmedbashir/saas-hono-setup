@@ -1,27 +1,50 @@
 import { mutationOptions } from "@tanstack/react-query";
 import { getQueryClient } from "@/lib/query-client";
-import { createUser, updateUser, deleteUser } from "./service";
+import { createEmployee, setUserRole, banUser, unbanUser, removeUser } from "./service";
 import { userKeys } from "./queries";
-import type { UserMutationPayload } from "./types";
+import type { CreateEmployeePayload, PlatformRole } from "./types";
 
-export const createUserMutation = mutationOptions({
-  mutationFn: (data: UserMutationPayload) => createUser(data),
-  onSuccess: () => {
-    getQueryClient().invalidateQueries({ queryKey: userKeys.all });
+// `onSettled` (with an `!error` guard) is used instead of `onSuccess` because these
+// options are spread into `useMutation` calls that define their own `onSuccess` callbacks
+// for toasts/UI state. `onSuccess` would be silently overwritten; `onSettled` survives
+// the spread and still only invalidates when the mutation actually succeeded.
+const invalidateUsers = () => {
+  getQueryClient().invalidateQueries({ queryKey: userKeys.all });
+};
+
+export const createEmployeeMutation = mutationOptions({
+  mutationFn: (data: CreateEmployeePayload) => createEmployee(data),
+  onSettled: (_data, error) => {
+    if (!error) invalidateUsers();
   },
 });
 
-export const updateUserMutation = mutationOptions({
-  mutationFn: ({ id, values }: { id: number; values: UserMutationPayload }) =>
-    updateUser(id, values),
-  onSuccess: () => {
-    getQueryClient().invalidateQueries({ queryKey: userKeys.all });
+export const setUserRoleMutation = mutationOptions({
+  mutationFn: ({ userId, role }: { userId: string; role: PlatformRole }) =>
+    setUserRole(userId, role),
+  onSettled: (_data, error) => {
+    if (!error) invalidateUsers();
   },
 });
 
-export const deleteUserMutation = mutationOptions({
-  mutationFn: (id: number) => deleteUser(id),
-  onSuccess: () => {
-    getQueryClient().invalidateQueries({ queryKey: userKeys.all });
+export const banUserMutation = mutationOptions({
+  mutationFn: ({ userId, banReason }: { userId: string; banReason?: string }) =>
+    banUser(userId, banReason),
+  onSettled: (_data, error) => {
+    if (!error) invalidateUsers();
+  },
+});
+
+export const unbanUserMutation = mutationOptions({
+  mutationFn: (userId: string) => unbanUser(userId),
+  onSettled: (_data, error) => {
+    if (!error) invalidateUsers();
+  },
+});
+
+export const removeUserMutation = mutationOptions({
+  mutationFn: (userId: string) => removeUser(userId),
+  onSettled: (_data, error) => {
+    if (!error) invalidateUsers();
   },
 });

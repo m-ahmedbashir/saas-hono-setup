@@ -1,28 +1,42 @@
-export type { User } from "@/constants/mock-api-users";
+// Real platform users — Better Auth's own `user` row (see packages/core/src/auth
+// index.ts's admin plugin), not the template's fake first_name/last_name/phone/status
+// shape. `role` matches packages/core/src/auth/platform-permissions.ts's two tiers
+// ("admin" | "support"); anything else (or null/undefined) is treated as no platform
+// access at all — see AGENTS.md's Platform admin section.
+export interface PlatformUser {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  role: string | null | undefined;
+  banned: boolean | null;
+  banReason?: string | null;
+  banExpires?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type PlatformRole = "admin" | "support";
 
 export type UserFilters = {
   page?: number;
   limit?: number;
-  roles?: string;
+  role?: string;
   search?: string;
-  sort?: string;
+  // Matches authClient.admin.listUsers's own shape directly (single-column sort) rather
+  // than a JSON-stringified TanStack Table sort array — one fewer translation step.
+  sortBy?: string;
+  sortDirection?: "asc" | "desc";
 };
 
 export type UsersResponse = {
-  success: boolean;
-  time: string;
-  message: string;
-  total_users: number;
-  offset: number;
-  limit: number;
-  users: import("@/constants/mock-api-users").User[];
+  users: PlatformUser[];
+  total: number;
 };
 
-export type UserMutationPayload = {
-  first_name: string;
-  last_name: string;
+export type CreateEmployeePayload = {
+  name: string;
   email: string;
-  phone: string;
-  role: string;
-  status: string;
+  password: string;
+  role: PlatformRole;
 };

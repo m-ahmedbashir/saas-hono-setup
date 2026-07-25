@@ -4,6 +4,7 @@ import { searchParamsCache } from "@/lib/searchparams";
 import type { SearchParams } from "nuqs/server";
 import { usersInfoContent } from "@/features/users/info-content";
 import { UserFormSheetTrigger } from "@/features/users/components/user-form-sheet";
+import { PlatformAccessGate } from "@/features/users/components/platform-access-gate";
 
 export const metadata = {
   title: "Dashboard: Users",
@@ -19,12 +20,14 @@ export default async function UsersPage(props: PageProps) {
 
   return (
     <PageContainer
-      pageTitle="Users"
-      pageDescription="Manage users (React Query + nuqs table pattern.)"
+      pageTitle="Platform Users"
+      pageDescription="Manage your team's platform access — admin and support roles."
       infoContent={usersInfoContent}
       pageHeaderAction={<UserFormSheetTrigger />}
     >
-      <UserListingPage />
+      <PlatformAccessGate>
+        <UserListingPage />
+      </PlatformAccessGate>
     </PageContainer>
   );
 }

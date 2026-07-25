@@ -95,6 +95,9 @@ importers:
       "@base-ui/react":
         specifier: ^1.6.0
         version: 1.6.0(@date-fns/tz@1.5.0)(@types/react@19.2.14)(date-fns@4.4.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      "@repo/core":
+        specifier: workspace:*
+        version: link:../../packages/core
       "@tabler/icons-react":
         specifier: ^3.40.0
         version: 3.45.0(react@19.2.4)

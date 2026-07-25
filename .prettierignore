@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+build
+.next
+out
+
+# Turborepo
+.turbo
+*.tsbuildinfo
+
+# Coverage
+coverage
+
+# Lockfile (large, machine-generated)
+pnpm-lock.yaml
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Husky internals
+.husky/_
+
+# Vercel / misc
+.vercel
+.DS_Store
+*.pem
