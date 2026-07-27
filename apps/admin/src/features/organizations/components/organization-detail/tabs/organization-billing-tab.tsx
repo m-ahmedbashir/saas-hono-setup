@@ -1,5 +1,5 @@
 import type { PlatformOrganizationDetail } from "../../../api/types";
-import { DetailField } from "../detail-field";
+import { DetailField } from "@/components/detail-field";
 
 interface OrganizationBillingTabProps {
   organization: PlatformOrganizationDetail;

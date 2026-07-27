@@ -12,7 +12,8 @@ interface BackButtonProps {
 // land on — a direct link/bookmark/new-tab open has browser history but nothing of
 // ours to go back to. document.referrer's origin is the signal for "did navigation
 // actually originate from this app," not window.history.length (that counts every
-// entry in the tab, including pages from before this app was ever opened).
+// entry in the tab, including pages from before this app was ever opened). Shared
+// across every detail page (organizations, individuals, ...) — not feature-specific.
 export function BackButton({ fallbackHref }: BackButtonProps) {
   const router = useRouter();
 

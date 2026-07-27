@@ -12,6 +12,9 @@ export const searchParams = {
   gender: parseAsString,
   category: parseAsString,
   role: parseAsString,
+  plan: parseAsString,
+  subscriptionStatus: parseAsString,
+  organizations: parseAsString,
   sort: parseAsString,
   // advanced filter
   // filters: getFiltersStateParser().withDefault([]),

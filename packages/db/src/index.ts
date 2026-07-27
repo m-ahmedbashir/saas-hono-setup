@@ -43,7 +43,19 @@ export async function closePool(): Promise<void> {
 
 export * from "./schema";
 export * from "./organization-profile";
-export { eq, and, count, desc, inArray, ilike } from "drizzle-orm";
+export {
+  eq,
+  and,
+  or,
+  count,
+  desc,
+  inArray,
+  notInArray,
+  isNull,
+  ilike,
+  exists,
+  notExists,
+} from "drizzle-orm";
 
 /** Whatever `db.transaction`'s callback receives — a `db`-shaped executor, scoped to one transaction. */
 export type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
