@@ -1,13 +1,13 @@
 ---
 name: nextjs-shadcn-frontend
-description: Build production-ready Next.js UI features in apps/web using shadcn/ui, TanStack Form, React Query, and the project's auth/data conventions. Use for new pages, feature slices, dialogs, tables, forms, or dashboards.
+description: Build production-ready Next.js UI features in apps/admin using shadcn/ui, TanStack Form, React Query, and the project's auth/data conventions. Use for new pages, feature slices, dialogs, tables, forms, or dashboards.
 ---
 
 # Next.js + Shadcn Frontend Feature Build
 
 ## One-Shot Invocation Protocol
 
-When asked to build any UI feature in `apps/web`, run this protocol once and produce the full feature. Do not scaffold placeholders or leave files half-written.
+When asked to build any UI feature in `apps/admin`, run this protocol once and produce the full feature. Do not scaffold placeholders or leave files half-written.
 
 ### 1. Surface Definition (state before writing code)
 
@@ -23,16 +23,16 @@ Reply with a compact markdown block:
 
 Create exactly these files unless a smaller set is justified in the Surface Definition:
 
-| File                                                                   | Purpose                                                                            |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `apps/web/src/app/<route>/page.tsx`                                    | Server Component route entry. Loads data, sets metadata, renders the feature view. |
-| `apps/web/src/features/<feature>/components/<feature>-view.tsx`        | Main client or server component. Keeps route file thin.                            |
-| `apps/web/src/features/<feature>/components/<feature>-skeleton.tsx`    | `Skeleton` fallback for `Suspense` or initial loading.                             |
-| `apps/web/src/features/<feature>/components/<feature>-empty-state.tsx` | Empty state with icon, headline, and optional CTA. Never a blank wrapper.          |
-| `apps/web/src/features/<feature>/components/<feature>-error-state.tsx` | Error state with retry action.                                                     |
-| `apps/web/src/features/<feature>/hooks/use-<feature>.ts`               | React Query hook for client data fetching.                                         |
-| `apps/web/src/features/<feature>/schemas/<feature>.schema.ts`          | Zod schema for any form.                                                           |
-| `apps/web/src/features/<feature>/types.ts`                             | Domain types if not derivable from API or schema.                                  |
+| File                                                                     | Purpose                                                                            |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `apps/admin/src/app/<route>/page.tsx`                                    | Server Component route entry. Loads data, sets metadata, renders the feature view. |
+| `apps/admin/src/features/<feature>/components/<feature>-view.tsx`        | Main client or server component. Keeps route file thin.                            |
+| `apps/admin/src/features/<feature>/components/<feature>-skeleton.tsx`    | `Skeleton` fallback for `Suspense` or initial loading.                             |
+| `apps/admin/src/features/<feature>/components/<feature>-empty-state.tsx` | Empty state with icon, headline, and optional CTA. Never a blank wrapper.          |
+| `apps/admin/src/features/<feature>/components/<feature>-error-state.tsx` | Error state with retry action.                                                     |
+| `apps/admin/src/features/<feature>/hooks/use-<feature>.ts`               | React Query hook for client data fetching.                                         |
+| `apps/admin/src/features/<feature>/schemas/<feature>.schema.ts`          | Zod schema for any form.                                                           |
+| `apps/admin/src/features/<feature>/types.ts`                             | Domain types if not derivable from API or schema.                                  |
 
 ### 3. Verification Before Finishing
 
@@ -48,7 +48,7 @@ Check the verification checklist at the bottom of this skill before declaring th
 - Forms: TanStack Form via `@/components/ui/tanstack-form` (`useAppForm`, `useFormFields`).
 - Auth: `better-auth/react` via `@/lib/auth-client.ts` (`useSession`, `signIn`, `signOut`).
 - Data: React Query via `@/lib/query-client.ts` and `@/components/layout/query-provider`. Server fetch directly from `NEXT_PUBLIC_API_URL`.
-- Routing guard: `apps/web/src/proxy.ts` (uses `export const config = {...}`, **not** `proxyConfig`).
+- Routing guard: `apps/admin/src/proxy.ts` (uses `export const config = {...}`, **not** `proxyConfig`).
 - Icons: `@/components/icons` (Tabler icons).
 
 ### Server vs Client Boundaries
@@ -340,7 +340,7 @@ export function FeatureErrorState({ retry }: { retry: () => void }) {
 - Use Vitest + React Testing Library + jsdom.
 - Mock only I/O boundaries: `next/navigation`, `authClient.*`, and `fetch` calls.
 - Test real rendering, form validation, and user interactions.
-- Reference: `apps/web/src/features/auth/components/sign-in-view.test.tsx`.
+- Reference: `apps/admin/src/features/auth/components/sign-in-view.test.tsx`.
 
 ---
 
@@ -359,6 +359,6 @@ Before finishing any frontend feature:
 - [ ] Data fetches target `NEXT_PUBLIC_API_URL` directly, not a Next.js proxy.
 - [ ] Auth uses `authClient` from `@/lib/auth-client`.
 - [ ] No nested `Card` components; use `divide-y` or `bg-muted/30` instead.
-- [ ] TypeScript strict mode passes: `pnpm --filter @repo/web typecheck`.
-- [ ] Lint passes: `pnpm --filter @repo/web lint`.
-- [ ] Tests pass: `pnpm --filter @repo/web test`.
+- [ ] TypeScript strict mode passes: `pnpm --filter @repo/admin typecheck`.
+- [ ] Lint passes: `pnpm --filter @repo/admin lint`.
+- [ ] Tests pass: `pnpm --filter @repo/admin test`.

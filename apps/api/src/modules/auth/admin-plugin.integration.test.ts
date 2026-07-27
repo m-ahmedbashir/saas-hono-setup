@@ -186,7 +186,7 @@ describe("Platform admin (Better Auth admin plugin)", () => {
     expect(removeRes.status).toBe(403);
   }, 20000);
 
-  // Regression test: apps/web's Users page (features/users/api/service.ts) was showing
+  // Regression test: apps/admin's Users page (features/users/api/service.ts) was showing
   // every account on the platform, not just admin/support staff — Better Auth assigns
   // every regular signup/org-member `role: "user"` by default, and the old query only
   // filtered when an admin manually picked a role facet. The fix scopes the query to
