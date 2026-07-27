@@ -6,8 +6,9 @@ interface DetailFieldProps {
   link?: boolean;
 }
 
-// Shared label/value pair for the detail sections below — one place for the "—" empty
-// fallback and truncation rules instead of repeating them per field.
+// Shared label/value pair for detail-page sections (organizations, individuals, ...)
+// — one place for the "—" empty fallback and truncation rules instead of repeating
+// them per feature.
 export function DetailField({ label, value, capitalize, mono, link }: DetailFieldProps) {
   return (
     <div className="flex min-w-0 flex-col gap-1">

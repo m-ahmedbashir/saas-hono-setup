@@ -10,8 +10,15 @@ import type { listPlatformIndividualsQuerySchema } from "./platform-individuals.
 export async function listPlatformIndividualsHandler(
   c: ValidatedQueryContext<typeof listPlatformIndividualsQuerySchema>,
 ) {
-  const { page, limit, search } = c.req.valid("query");
-  const result = await listPlatformIndividuals({ page, limit, search });
+  const { page, limit, search, plan, subscriptionStatus, hasOrganization } = c.req.valid("query");
+  const result = await listPlatformIndividuals({
+    page,
+    limit,
+    search,
+    plan,
+    subscriptionStatus,
+    hasOrganization,
+  });
 
   return success(c, result);
 }

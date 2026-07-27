@@ -73,14 +73,19 @@ async function createPlatformAccount(role: "admin" | "support", labelPrefix: str
 // Seeds profile/individual_billing directly (withSystemScope) rather than exercising
 // PATCH /profile or a real Stripe checkout — those flows have their own tests; this
 // file is only about the platform-individuals view over whatever data already exists.
-async function seedProfileAndBilling(userId: string, phone: string, plan: string) {
+async function seedProfileAndBilling(
+  userId: string,
+  phone: string,
+  plan: string,
+  subscriptionStatus = "active",
+) {
   await withSystemScope(async (tx) => {
     await tx.insert(profileTable).values({ id: crypto.randomUUID(), userId, phone });
     await tx.insert(individualBillingTable).values({
       id: crypto.randomUUID(),
       userId,
       plan,
-      subscriptionStatus: "active",
+      subscriptionStatus,
     });
   });
 }
@@ -226,6 +231,101 @@ describe("GET /platform-individuals", () => {
     expect(body.data.organizations.some((o) => o.id === secondOrgId && o.role === "member")).toBe(
       true,
     );
+  }, 25000);
+
+  it("filters by plan", async () => {
+    const admin = await createPlatformAccount("admin", "platform-ind-plan-admin");
+    cleanupUserIds.push(admin.userId);
+
+    const marker = `PlanMarker${Date.now()}`;
+    const proTarget = await signUp(`platform-ind-plan-pro-${Date.now()}@example.com`, marker);
+    cleanupUserIds.push(proTarget.userId);
+    await seedProfileAndBilling(proTarget.userId, "+15550000001", "individual_pro");
+
+    const freeTarget = await signUp(`platform-ind-plan-free-${Date.now()}@example.com`, marker);
+    cleanupUserIds.push(freeTarget.userId);
+    await seedProfileAndBilling(freeTarget.userId, "+15550000002", "individual_free");
+
+    const res = await fetch(
+      `http://localhost:${PORT}/platform-individuals?search=${marker}&plan=individual_pro`,
+      { headers: { Origin: ORIGIN, Cookie: admin.cookie } },
+    );
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { data: { individuals: { id: string }[]; total: number } };
+    expect(body.data.total).toBe(1);
+    expect(body.data.individuals[0]?.id).toBe(proTarget.userId);
+  }, 20000);
+
+  it("filters by subscriptionStatus", async () => {
+    const admin = await createPlatformAccount("admin", "platform-ind-status-admin");
+    cleanupUserIds.push(admin.userId);
+
+    const marker = `StatusMarker${Date.now()}`;
+    const activeTarget = await signUp(
+      `platform-ind-status-active-${Date.now()}@example.com`,
+      marker,
+    );
+    cleanupUserIds.push(activeTarget.userId);
+    await seedProfileAndBilling(activeTarget.userId, "+15550000003", "individual_pro", "active");
+
+    const canceledTarget = await signUp(
+      `platform-ind-status-canceled-${Date.now()}@example.com`,
+      marker,
+    );
+    cleanupUserIds.push(canceledTarget.userId);
+    await seedProfileAndBilling(
+      canceledTarget.userId,
+      "+15550000004",
+      "individual_pro",
+      "canceled",
+    );
+
+    const res = await fetch(
+      `http://localhost:${PORT}/platform-individuals?search=${marker}&subscriptionStatus=canceled`,
+      { headers: { Origin: ORIGIN, Cookie: admin.cookie } },
+    );
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { data: { individuals: { id: string }[]; total: number } };
+    expect(body.data.total).toBe(1);
+    expect(body.data.individuals[0]?.id).toBe(canceledTarget.userId);
+  }, 20000);
+
+  it("filters by hasOrganization — the 'no organization association' facet", async () => {
+    const admin = await createPlatformAccount("admin", "platform-ind-haorg-admin");
+    cleanupUserIds.push(admin.userId);
+
+    const marker = `OrgAssocMarker${Date.now()}`;
+    const soloTarget = await signUp(`platform-ind-haorg-solo-${Date.now()}@example.com`, marker);
+    cleanupUserIds.push(soloTarget.userId);
+
+    const orgOwner = await signUp(`platform-ind-haorg-owner-${Date.now()}@example.com`, marker);
+    cleanupUserIds.push(orgOwner.userId);
+    const orgId = await createOrg(orgOwner.cookie, "HasOrg Test Org");
+    cleanupOrgIds.push(orgId);
+
+    const noOrgRes = await fetch(
+      `http://localhost:${PORT}/platform-individuals?search=${marker}&hasOrganization=false`,
+      { headers: { Origin: ORIGIN, Cookie: admin.cookie } },
+    );
+    expect(noOrgRes.status).toBe(200);
+    const noOrgBody = (await noOrgRes.json()) as {
+      data: { individuals: { id: string }[]; total: number };
+    };
+    expect(noOrgBody.data.total).toBe(1);
+    expect(noOrgBody.data.individuals[0]?.id).toBe(soloTarget.userId);
+
+    const hasOrgRes = await fetch(
+      `http://localhost:${PORT}/platform-individuals?search=${marker}&hasOrganization=true`,
+      { headers: { Origin: ORIGIN, Cookie: admin.cookie } },
+    );
+    expect(hasOrgRes.status).toBe(200);
+    const hasOrgBody = (await hasOrgRes.json()) as {
+      data: { individuals: { id: string }[]; total: number };
+    };
+    expect(hasOrgBody.data.total).toBe(1);
+    expect(hasOrgBody.data.individuals[0]?.id).toBe(orgOwner.userId);
   }, 25000);
 });
 

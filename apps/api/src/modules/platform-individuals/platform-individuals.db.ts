@@ -13,6 +13,8 @@ import {
   notInArray,
   isNull,
   ilike,
+  exists,
+  notExists,
   type DbExecutor,
 } from "@repo/db";
 import { platformRoles } from "@repo/core/auth/platform-permissions";
@@ -28,9 +30,43 @@ const PLATFORM_STAFF_ROLES = Object.keys(platformRoles);
 // Both branches are required for this to actually mean "everyone but staff".
 const isNonStaff = or(isNull(user.role), notInArray(user.role, PLATFORM_STAFF_ROLES));
 
-function searchFilter(search?: string) {
-  if (!search) return isNonStaff;
-  return and(isNonStaff, or(ilike(user.name, `%${search}%`), ilike(user.email, `%${search}%`)));
+export interface IndividualFilters {
+  search?: string;
+  plan?: string[];
+  subscriptionStatus?: string[];
+  hasOrganization?: boolean;
+}
+
+// `hasOrganization` correlates against `member` directly (EXISTS/NOT EXISTS), never
+// by joining `member` into the main query — same duplication hazard
+// getOrganizationMemberships's own comment describes: `member` has no unique
+// constraint per userId, so a join would multiply a row per membership and corrupt
+// both pagination and this filter's own row count.
+function buildFilter(tx: DbExecutor, filters: IndividualFilters) {
+  const conditions = [isNonStaff];
+
+  if (filters.search) {
+    conditions.push(
+      or(ilike(user.name, `%${filters.search}%`), ilike(user.email, `%${filters.search}%`))!,
+    );
+  }
+  if (filters.plan && filters.plan.length > 0) {
+    conditions.push(inArray(individualBilling.plan, filters.plan));
+  }
+  if (filters.subscriptionStatus && filters.subscriptionStatus.length > 0) {
+    conditions.push(inArray(individualBilling.subscriptionStatus, filters.subscriptionStatus));
+  }
+  if (filters.hasOrganization !== undefined) {
+    const membershipSubquery = tx
+      .select({ id: member.id })
+      .from(member)
+      .where(eq(member.userId, user.id));
+    conditions.push(
+      filters.hasOrganization ? exists(membershipSubquery) : notExists(membershipSubquery),
+    );
+  }
+
+  return and(...conditions);
 }
 
 export interface PlatformIndividualRow {
@@ -56,7 +92,7 @@ export async function listIndividualsPage(
   tx: DbExecutor,
   limit: number,
   offset: number,
-  search?: string,
+  filters: IndividualFilters = {},
 ): Promise<PlatformIndividualRow[]> {
   return tx
     .select({
@@ -74,7 +110,7 @@ export async function listIndividualsPage(
     .from(user)
     .leftJoin(profile, eq(profile.userId, user.id))
     .leftJoin(individualBilling, eq(individualBilling.userId, user.id))
-    .where(searchFilter(search))
+    .where(buildFilter(tx, filters))
     .orderBy(desc(user.createdAt))
     .limit(limit)
     .offset(offset);
@@ -82,8 +118,18 @@ export async function listIndividualsPage(
 
 // Same filter as listIndividualsPage, applied independently — pagination's `total`
 // must reflect the filtered count, not the whole table's.
-export async function countIndividuals(tx: DbExecutor, search?: string): Promise<number> {
-  const [row] = await tx.select({ value: count() }).from(user).where(searchFilter(search));
+export async function countIndividuals(
+  tx: DbExecutor,
+  filters: IndividualFilters = {},
+): Promise<number> {
+  // Must join individualBilling too (not just select from `user`) — buildFilter's
+  // plan/subscriptionStatus conditions reference its columns, and referencing a table
+  // absent from FROM/JOIN is invalid SQL, not just an empty-result no-op.
+  const [row] = await tx
+    .select({ value: count() })
+    .from(user)
+    .leftJoin(individualBilling, eq(individualBilling.userId, user.id))
+    .where(buildFilter(tx, filters));
   return row?.value ?? 0;
 }
 

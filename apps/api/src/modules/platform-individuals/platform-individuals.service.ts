@@ -59,13 +59,22 @@ export async function listPlatformIndividuals(params: {
   page: number;
   limit: number;
   search?: string;
+  plan?: string[];
+  subscriptionStatus?: string[];
+  hasOrganization?: boolean;
 }): Promise<ListPlatformIndividualsResult> {
   const offset = (params.page - 1) * params.limit;
+  const filters = {
+    search: params.search,
+    plan: params.plan,
+    subscriptionStatus: params.subscriptionStatus,
+    hasOrganization: params.hasOrganization,
+  };
 
   return withSystemScope(async (tx) => {
     const [rows, total] = await Promise.all([
-      listIndividualsPage(tx, params.limit, offset, params.search),
-      countIndividuals(tx, params.search),
+      listIndividualsPage(tx, params.limit, offset, filters),
+      countIndividuals(tx, filters),
     ]);
 
     const memberships = await getOrganizationMemberships(

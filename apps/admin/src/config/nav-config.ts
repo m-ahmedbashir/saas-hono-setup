@@ -63,6 +63,15 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         items: [],
       },
+
+      {
+        title: "Individuals",
+        url: "/dashboard/individuals",
+        icon: "user",
+        shortcut: ["i", "i"],
+        isActive: false,
+        items: [],
+      },
     ],
   },
   {

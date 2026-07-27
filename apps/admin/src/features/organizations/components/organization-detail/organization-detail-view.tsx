@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { platformOrganizationDetailQueryOptions } from "../../api/queries";
 import { unbanOrganizationMutation } from "../../api/mutations";
 import { BanOrganizationModal } from "../ban-organization-modal";
-import { BackButton } from "./back-button";
+import { BackButton } from "@/components/back-button";
 import { OrganizationDetailsTab } from "./tabs/organization-details-tab";
 import { OrganizationBillingTab } from "./tabs/organization-billing-tab";
 import { OrganizationMembersTab } from "./tabs/organization-members-tab";
