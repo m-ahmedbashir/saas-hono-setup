@@ -54,6 +54,15 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         items: [],
       },
+
+      {
+        title: "Organizations",
+        url: "/dashboard/organizations",
+        icon: "workspace",
+        shortcut: ["o", "o"],
+        isActive: false,
+        items: [],
+      },
     ],
   },
   {

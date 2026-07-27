@@ -20,6 +20,15 @@ export const platformStatement = {
     "update",
   ],
   session: ["list", "revoke", "delete"],
+  // Not one of the admin plugin's own resources (that plugin only knows about
+  // `user`/`session`) — added so `requirePlatformPermission`
+  // (apps/api/src/middleware/platform-permission.middleware.ts) can reuse this same
+  // statement/roles/authorize() machinery for platform-wide, non-admin-plugin routes
+  // (GET/POST /platform-organizations) instead of inventing a second, parallel
+  // permission system. `create` is provisioning a new tenant on someone else's behalf —
+  // admin-only, not granted to `support` (read-only tier, same reasoning as `user`'s
+  // create/set-role/ban being withheld from it above).
+  organization: ["list", "create"],
 } as const;
 
 export const platformAccessControl = createAccessControl(platformStatement);
@@ -50,17 +59,20 @@ export const platformAdminRole = platformAccessControl.newRole({
     "update",
   ],
   session: ["list", "revoke", "delete"],
+  organization: ["list", "create"],
 });
 
 /**
  * Read-only operator tier — can look up/list users (e.g. to verify an account exists,
  * help a customer) but can't ban, delete, change roles, reset passwords, or impersonate.
  * A genuine, deliberately bounded second tier, not "everything admin has minus one
- * thing."
+ * thing." Also granted `organization: ["list"]` — same "read-only visibility" tier as
+ * users, for the platform organizations oversight view.
  */
 export const platformSupportRole = platformAccessControl.newRole({
   user: ["list", "get"],
   session: [],
+  organization: ["list"],
 });
 
 /**

@@ -14,3 +14,11 @@ export type ValidatedJsonContext<Schema extends z.ZodType> = Context<
   string,
   { in: { json: z.input<Schema> }; out: { json: z.output<Schema> } }
 >;
+
+/** Same reasoning as `ValidatedJsonContext`, for the "query" zValidator target instead. */
+export type ValidatedQueryContext<Schema extends z.ZodType> = Context<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  any,
+  string,
+  { in: { query: z.input<Schema> }; out: { query: z.output<Schema> } }
+>;

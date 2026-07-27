@@ -45,11 +45,22 @@ export async function getUsers(
           searchOperator: "contains" as const,
           searchValue: filters.search,
         }),
-        ...(filters.role && {
-          filterField: "role",
-          filterOperator: "eq" as const,
-          filterValue: filters.role,
-        }),
+        // Always scoped to platform staff (admin/support) — never the bare "user" role
+        // Better Auth assigns every regular signup/org-member by default. Without this,
+        // authClient.admin.listUsers returns literally every account in the system
+        // (Better Auth has no concept of "platform" vs "regular" user, only this app's
+        // role split does), which is exactly wrong for a page titled "Platform Users."
+        // A facet pick of one specific role (filters.role) narrows further via `eq`;
+        // otherwise `in` scopes to the whole platform-staff set. `in`/`filterValue` as
+        // an array is a real, fully-implemented adapter operator (`inArray` under the
+        // hood) — verified against the installed drizzle-adapter source, not assumed.
+        ...(filters.role
+          ? { filterField: "role", filterOperator: "eq" as const, filterValue: filters.role }
+          : {
+              filterField: "role",
+              filterOperator: "in" as const,
+              filterValue: ["admin", "support"],
+            }),
         ...(filters.sortBy && {
           sortBy: filters.sortBy,
           sortDirection: filters.sortDirection ?? "asc",
