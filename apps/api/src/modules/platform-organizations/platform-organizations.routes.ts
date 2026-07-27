@@ -7,10 +7,13 @@ import { requirePlatformPermission } from "../../middleware/platform-permission.
 import {
   listPlatformOrganizationsQuerySchema,
   createPlatformOrganizationSchema,
+  banPlatformOrganizationSchema,
 } from "./platform-organizations.schema";
 import {
   listPlatformOrganizationsHandler,
   createPlatformOrganizationHandler,
+  banPlatformOrganizationHandler,
+  unbanPlatformOrganizationHandler,
 } from "./platform-organizations.controller";
 
 // Same re-throw-through-AppError pattern as every other validated route in this repo
@@ -31,10 +34,18 @@ const validateCreateBody = zValidator("json", createPlatformOrganizationSchema, 
   }
 });
 
-// Platform-wide, not org-scoped — no requireOrgContext on either route. GET
+const validateBanBody = zValidator("json", banPlatformOrganizationSchema, (result) => {
+  if (!result.success) {
+    throw new AppError("VALIDATION_ERROR", "Invalid ban payload", flattenError(result.error));
+  }
+});
+
+// Platform-wide, not org-scoped — no requireOrgContext on any of these routes. GET
 // deliberately lists every organization regardless of which (if any) is the caller's
 // active org; POST provisions a new organization + owner for a company that isn't a
-// member of anything yet, so there's no active org to require in the first place.
+// member of anything yet; ban/unban act on an arbitrary :organizationId, not the
+// caller's own active org. `ban` is a separate permission from `list`/`create` —
+// admin-only, withheld from support (packages/core/src/auth/platform-permissions.ts).
 export const platformOrganizationsRoutes = new Hono()
   .get(
     "/",
@@ -49,4 +60,17 @@ export const platformOrganizationsRoutes = new Hono()
     requirePlatformPermission({ organization: ["create"] }),
     validateCreateBody,
     createPlatformOrganizationHandler,
+  )
+  .post(
+    "/:organizationId/ban",
+    injectUserContext,
+    requirePlatformPermission({ organization: ["ban"] }),
+    validateBanBody,
+    banPlatformOrganizationHandler,
+  )
+  .post(
+    "/:organizationId/unban",
+    injectUserContext,
+    requirePlatformPermission({ organization: ["ban"] }),
+    unbanPlatformOrganizationHandler,
   );

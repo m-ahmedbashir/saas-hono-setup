@@ -6,6 +6,11 @@ import type {
   CreatePlatformOrganizationResult,
 } from "./types";
 
+interface SuspensionResult {
+  organizationId: string;
+  suspended: boolean;
+}
+
 export async function getPlatformOrganizations(
   filters: PlatformOrganizationFilters,
   headers?: HeadersInit,
@@ -28,5 +33,21 @@ export async function createPlatformOrganization(
   return apiFetch<CreatePlatformOrganizationResult>("/platform-organizations", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function banOrganization(
+  organizationId: string,
+  reason?: string,
+): Promise<SuspensionResult> {
+  return apiFetch<SuspensionResult>(`/platform-organizations/${organizationId}/ban`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function unbanOrganization(organizationId: string): Promise<SuspensionResult> {
+  return apiFetch<SuspensionResult>(`/platform-organizations/${organizationId}/unban`, {
+    method: "POST",
   });
 }

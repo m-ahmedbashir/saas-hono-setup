@@ -22,6 +22,9 @@ export interface PlatformOrganization {
   website: string | null;
   phone: string | null;
   taxId: string | null;
+  suspended: boolean | null;
+  suspendedAt: Date | null;
+  suspensionReason: string | null;
 }
 
 export type PlatformOrganizationFilters = {
@@ -46,4 +49,9 @@ export type CreatePlatformOrganizationPayload = {
 export type CreatePlatformOrganizationResult = {
   organizationId: string;
   ownerUserId: string;
+};
+
+export type BanOrganizationPayload = {
+  organizationId: string;
+  reason?: string;
 };

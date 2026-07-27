@@ -14,3 +14,9 @@ export const createPlatformOrganizationSchema = z.object({
 });
 
 export type CreatePlatformOrganizationFormValues = z.infer<typeof createPlatformOrganizationSchema>;
+
+export const banOrganizationSchema = z.object({
+  reason: z.string().max(500, "Reason must be 500 characters or fewer").optional(),
+});
+
+export type BanOrganizationFormValues = z.infer<typeof banOrganizationSchema>;

@@ -27,8 +27,10 @@ export const platformStatement = {
   // (GET/POST /platform-organizations) instead of inventing a second, parallel
   // permission system. `create` is provisioning a new tenant on someone else's behalf —
   // admin-only, not granted to `support` (read-only tier, same reasoning as `user`'s
-  // create/set-role/ban being withheld from it above).
-  organization: ["list", "create"],
+  // create/set-role/ban being withheld from it above). `ban` is a flag-only oversight
+  // action for now (organization_profile.suspended) — no route enforces it yet, see
+  // platform-organizations.service.ts.
+  organization: ["list", "create", "ban"],
 } as const;
 
 export const platformAccessControl = createAccessControl(platformStatement);
@@ -59,7 +61,7 @@ export const platformAdminRole = platformAccessControl.newRole({
     "update",
   ],
   session: ["list", "revoke", "delete"],
-  organization: ["list", "create"],
+  organization: ["list", "create", "ban"],
 });
 
 /**

@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Icons } from "@/components/icons";
 import type { PlatformOrganization } from "../../api/types";
 import { ColumnDef } from "@tanstack/react-table";
+import { CellAction } from "./cell-action";
 
 // Plain string headers, not DataTableColumnHeader — this endpoint (apps/api/src/
 // modules/platform-organizations) has no sortBy/sortDirection param, so a sortable
@@ -27,6 +28,31 @@ export const columns: ColumnDef<PlatformOrganization>[] = [
       icon: Icons.text,
     },
     enableColumnFilter: true,
+  },
+  {
+    id: "suspended",
+    accessorKey: "suspended",
+    header: "Status",
+    // Suspended state, own to the organization — separate from the Owner column's
+    // Verified/Banned badges, which describe the owner *user*, not the org row itself.
+    // Flag-only (see specs/platform-organizations.md): shown for visibility, doesn't
+    // reflect any real access restriction yet.
+    cell: ({ row }) => {
+      const org = row.original;
+      if (!org.suspended) {
+        return <Badge variant="default">Active</Badge>;
+      }
+      return (
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <Badge variant="destructive">Suspended</Badge>
+          {org.suspensionReason && (
+            <span className="text-muted-foreground max-w-40 truncate text-xs">
+              {org.suspensionReason}
+            </span>
+          )}
+        </div>
+      );
+    },
   },
   {
     id: "owner",
@@ -185,5 +211,9 @@ export const columns: ColumnDef<PlatformOrganization>[] = [
         </span>
       );
     },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => <CellAction data={row.original} />,
   },
 ];

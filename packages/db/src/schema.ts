@@ -223,6 +223,15 @@ export const organizationProfile = pgTable(
     addressState: text("address_state"),
     addressPostalCode: text("address_postal_code"),
     addressCountry: text("address_country"),
+    // Platform-admin oversight flag, not a self-service organization setting — set only
+    // via apps/api's platform-organizations module (requirePlatformPermission-gated).
+    // Flag-only for now, no access enforcement wired to it yet: no route currently
+    // checks this before letting a suspended org's members act. See
+    // specs/platform-organizations.md for the deliberate scope of "flag now, enforcement
+    // later, once it's agreed which routes it should actually block."
+    suspended: boolean("suspended").default(false).notNull(),
+    suspendedAt: timestamp("suspended_at"),
+    suspensionReason: text("suspension_reason"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

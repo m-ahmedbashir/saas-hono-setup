@@ -10,6 +10,7 @@ import {
   desc,
   inArray,
   ilike,
+  ensureOrganizationProfileRow,
   type DbExecutor,
   type AnyExecutor,
 } from "@repo/db";
@@ -28,6 +29,13 @@ export interface PlatformOrganizationRow {
   website: string | null;
   phone: string | null;
   taxId: string | null;
+  // Nullable despite the column itself being NOT NULL on organization_profile — this is
+  // a LEFT JOIN, so an org whose profile row doesn't exist yet (pre-dates the eager
+  // creation hook) surfaces as null here, same as every other organizationProfile field
+  // above.
+  suspended: boolean | null;
+  suspendedAt: Date | null;
+  suspensionReason: string | null;
 }
 
 // Must run inside withSystemScope (platform-organizations.service.ts) — organization_
@@ -57,6 +65,9 @@ export async function listOrganizationsPage(
       website: organizationProfile.website,
       phone: organizationProfile.phone,
       taxId: organizationProfile.taxId,
+      suspended: organizationProfile.suspended,
+      suspendedAt: organizationProfile.suspendedAt,
+      suspensionReason: organizationProfile.suspensionReason,
     })
     .from(organization)
     .leftJoin(organizationBilling, eq(organizationBilling.organizationId, organization.id))
@@ -88,6 +99,40 @@ export async function organizationSlugExists(tx: AnyExecutor, slug: string): Pro
     .from(organization)
     .where(eq(organization.slug, slug));
   return row !== undefined;
+}
+
+export async function organizationExists(
+  tx: AnyExecutor,
+  organizationId: string,
+): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: organization.id })
+    .from(organization)
+    .where(eq(organization.id, organizationId));
+  return row !== undefined;
+}
+
+// Must run inside withSystemScope — organization_profile is RLS-enabled, and this is a
+// platform-admin action on an arbitrary org, not something scoped to the caller's own
+// active org. ensureOrganizationProfileRow first — an org created before the eager
+// creation hook existed (or any other edge case where it didn't run) would otherwise
+// have no row for this UPDATE to match. Flag-only, per specs/platform-organizations.md:
+// clears suspendedAt/suspensionReason on unban rather than leaving stale data behind.
+export async function setOrganizationSuspension(
+  tx: DbExecutor,
+  organizationId: string,
+  suspended: boolean,
+  reason: string | null,
+): Promise<void> {
+  await ensureOrganizationProfileRow(tx, organizationId);
+  await tx
+    .update(organizationProfile)
+    .set({
+      suspended,
+      suspendedAt: suspended ? new Date() : null,
+      suspensionReason: suspended ? reason : null,
+    })
+    .where(eq(organizationProfile.organizationId, organizationId));
 }
 
 export interface OrganizationOwnerAndMemberCount {

@@ -361,3 +361,120 @@ describe("POST /platform-organizations", () => {
     expect(res.status).toBe(422);
   }, 20000);
 });
+
+describe("POST /platform-organizations/:organizationId/ban and /unban", () => {
+  it("rejects an unauthenticated request", async () => {
+    const res = await fetch(`http://localhost:${PORT}/platform-organizations/some-id/ban`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a regular user with no platform role", async () => {
+    const regular = await signUp(`platform-org-ban-regular-${Date.now()}@example.com`);
+    cleanupUserIds.push(regular.userId);
+
+    const res = await fetch(`http://localhost:${PORT}/platform-organizations/some-id/ban`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: regular.cookie },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  // ban is admin-only, deliberately withheld from support — same reasoning as create.
+  it('rejects a user.role:"support" account', async () => {
+    const support = await createPlatformAccount("support", "platform-org-ban-support");
+    cleanupUserIds.push(support.userId);
+
+    const res = await fetch(`http://localhost:${PORT}/platform-organizations/some-id/ban`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: support.cookie },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(403);
+  }, 15000);
+
+  it("returns 404 for a nonexistent organization", async () => {
+    const admin = await createPlatformAccount("admin", "platform-org-ban-404-admin");
+    cleanupUserIds.push(admin.userId);
+
+    const res = await fetch(`http://localhost:${PORT}/platform-organizations/does-not-exist/ban`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: admin.cookie },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(404);
+  }, 15000);
+
+  it("bans an organization with a reason (flag-only — records it, no access is blocked), then unban clears it, both reflected in the list", async () => {
+    const admin = await createPlatformAccount("admin", "platform-org-ban-admin");
+    cleanupUserIds.push(admin.userId);
+
+    const owner = await signUp(`platform-org-ban-owner-${Date.now()}@example.com`);
+    cleanupUserIds.push(owner.userId);
+    const orgId = await createOrg(owner.cookie, "Bannable Org");
+    cleanupOrgIds.push(orgId);
+
+    const banRes = await fetch(`http://localhost:${PORT}/platform-organizations/${orgId}/ban`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: admin.cookie },
+      body: JSON.stringify({ reason: "Chargeback dispute under review" }),
+    });
+    expect(banRes.status).toBe(200);
+
+    const listAfterBan = await fetch(`http://localhost:${PORT}/platform-organizations?limit=100`, {
+      headers: { Origin: ORIGIN, Cookie: admin.cookie },
+    });
+    const bodyAfterBan = (await listAfterBan.json()) as {
+      data: {
+        organizations: {
+          id: string;
+          suspended: boolean | null;
+          suspendedAt: string | null;
+          suspensionReason: string | null;
+        }[];
+      };
+    };
+    const bannedOrg = bodyAfterBan.data.organizations.find((o) => o.id === orgId);
+    expect(bannedOrg?.suspended).toBe(true);
+    expect(bannedOrg?.suspensionReason).toBe("Chargeback dispute under review");
+    expect(bannedOrg?.suspendedAt).not.toBeNull();
+
+    // The org's own owner is completely unaffected — flag-only, confirmed against the
+    // real member/session behavior, not just the org row.
+    const ownerStillWorks = await fetch(`http://localhost:${PORT}/organization-profile`, {
+      headers: { Origin: ORIGIN, Cookie: owner.cookie },
+    });
+    expect(ownerStillWorks.status).toBe(200);
+
+    const unbanRes = await fetch(`http://localhost:${PORT}/platform-organizations/${orgId}/unban`, {
+      method: "POST",
+      headers: { Origin: ORIGIN, Cookie: admin.cookie },
+    });
+    expect(unbanRes.status).toBe(200);
+
+    const listAfterUnban = await fetch(
+      `http://localhost:${PORT}/platform-organizations?limit=100`,
+      {
+        headers: { Origin: ORIGIN, Cookie: admin.cookie },
+      },
+    );
+    const bodyAfterUnban = (await listAfterUnban.json()) as {
+      data: {
+        organizations: {
+          id: string;
+          suspended: boolean | null;
+          suspendedAt: string | null;
+          suspensionReason: string | null;
+        }[];
+      };
+    };
+    const unbannedOrg = bodyAfterUnban.data.organizations.find((o) => o.id === orgId);
+    expect(unbannedOrg?.suspended).toBe(false);
+    expect(unbannedOrg?.suspensionReason).toBeNull();
+    expect(unbannedOrg?.suspendedAt).toBeNull();
+  }, 25000);
+});

@@ -31,6 +31,9 @@ export function OrganizationsTable() {
     pageCount,
     shallow: true,
     debounceMs: 500,
+    initialState: {
+      columnPinning: { right: ["actions"] },
+    },
   });
 
   return (

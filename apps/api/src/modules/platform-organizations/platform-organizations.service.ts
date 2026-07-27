@@ -6,6 +6,8 @@ import {
   countOrganizations,
   getOwnersAndMemberCounts,
   organizationSlugExists,
+  organizationExists,
+  setOrganizationSuspension,
 } from "./platform-organizations.db";
 import type { CreatePlatformOrganizationBody } from "./platform-organizations.schema";
 
@@ -28,6 +30,9 @@ export interface PlatformOrganizationSummary {
   website: string | null;
   phone: string | null;
   taxId: string | null;
+  suspended: boolean | null;
+  suspendedAt: Date | null;
+  suspensionReason: string | null;
 }
 
 export interface ListPlatformOrganizationsResult {
@@ -147,4 +152,29 @@ export async function createPlatformOrganization(
     if (error instanceof AppError) throw error;
     throw toValidationError(error, "Failed to create the organization");
   }
+}
+
+// Flag-only, per specs/platform-organizations.md — records the ban/reason on
+// organization_profile, doesn't block anything yet. withSystemScope: same reasoning as
+// listPlatformOrganizations, this is a platform-admin action on an arbitrary org, not
+// something scoped to the caller's own active org.
+export async function banPlatformOrganization(
+  organizationId: string,
+  reason: string | undefined,
+): Promise<void> {
+  await withSystemScope(async (tx) => {
+    if (!(await organizationExists(tx, organizationId))) {
+      throw new AppError("NOT_FOUND", "Organization not found");
+    }
+    await setOrganizationSuspension(tx, organizationId, true, reason ?? null);
+  });
+}
+
+export async function unbanPlatformOrganization(organizationId: string): Promise<void> {
+  await withSystemScope(async (tx) => {
+    if (!(await organizationExists(tx, organizationId))) {
+      throw new AppError("NOT_FOUND", "Organization not found");
+    }
+    await setOrganizationSuspension(tx, organizationId, false, null);
+  });
 }
