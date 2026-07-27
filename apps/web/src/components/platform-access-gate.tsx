@@ -8,10 +8,12 @@ import { Icons } from "@/components/icons";
 const PLATFORM_ROLES = new Set(["admin", "support"]);
 
 // Client-side only — a UX convenience (don't show the page/nav flash to someone who'll
-// just get 403s from every real action), not the actual security boundary. That's
-// Better Auth's own permission check on each authClient.admin.* call, already enforced
-// server-side regardless of whether this gate exists at all. See AGENTS.md's Platform
-// admin section on the admin/support role split.
+// just get 403s from every real action), not the actual security boundary. That's each
+// route's own server-side check (Better Auth's admin plugin for /dashboard/users,
+// requirePlatformPermission for /dashboard/organizations), already enforced regardless
+// of whether this gate exists at all. See AGENTS.md's Platform admin section on the
+// admin/support role split. Shared by both platform-admin pages rather than duplicated
+// per feature — same check, same two roles, same fallback.
 export function PlatformAccessGate({ children }: { children: React.ReactNode }) {
   const { data: session, isPending } = useSession();
   const router = useRouter();

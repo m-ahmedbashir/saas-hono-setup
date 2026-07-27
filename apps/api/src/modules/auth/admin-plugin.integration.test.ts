@@ -185,4 +185,36 @@ describe("Platform admin (Better Auth admin plugin)", () => {
     });
     expect(removeRes.status).toBe(403);
   }, 20000);
+
+  // Regression test: apps/web's Users page (features/users/api/service.ts) was showing
+  // every account on the platform, not just admin/support staff — Better Auth assigns
+  // every regular signup/org-member `role: "user"` by default, and the old query only
+  // filtered when an admin manually picked a role facet. The fix scopes the query to
+  // `filterField: "role", filterOperator: "in", filterValue: ["admin", "support"]` by
+  // default. Proven here against the real endpoint, not just the frontend code change —
+  // `in`/array filterValue is serialized as repeated query params by better-fetch
+  // (verified against its installed source), reproduced with a raw fetch the same way.
+  it('excludes a regular (role: "user") account when listing with filterField=role&filterOperator=in&filterValue=admin&filterValue=support', async () => {
+    const email = `admin-plugin-in-filter-admin-${Date.now()}@example.com`;
+    const password = "password1234";
+    const created = await auth.api.createUser({
+      body: { email, password, name: "In Filter Admin", role: "admin" },
+    });
+    cleanupUserIds.push(created.user.id);
+    const admin = await signIn(email, password);
+
+    const regular = await signUp(`admin-plugin-in-filter-regular-${Date.now()}@example.com`);
+    cleanupUserIds.push(regular.userId);
+
+    const res = await fetch(
+      `http://localhost:${PORT}/api/auth/admin/list-users?filterField=role&filterOperator=in&filterValue=admin&filterValue=support&limit=1000`,
+      { headers: { Origin: ORIGIN, Cookie: admin.cookie } },
+    );
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { users: { id: string; role: string | null }[] };
+    expect(body.users.some((u) => u.id === created.user.id)).toBe(true);
+    expect(body.users.some((u) => u.id === regular.userId)).toBe(false);
+    expect(body.users.every((u) => u.role === "admin" || u.role === "support")).toBe(true);
+  }, 20000);
 });

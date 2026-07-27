@@ -8,6 +8,11 @@ import { platformAccessControl, platformRoles } from "./platform-permissions";
 
 export { statement, roles } from "./permissions";
 export { platformStatement, platformRoles, platformAccessControl } from "./platform-permissions";
+// Re-exported for the same reason @repo/db re-exports drizzle-orm operators (see
+// AGENTS.md) — `better-auth` isn't a direct dependency of apps/api, only of this
+// package, so a consumer there importing `better-auth/api` directly could resolve a
+// different pnpm-isolated instance with incompatible types. Go through here instead.
+export { isAPIError } from "better-auth/api";
 
 /**
  * Comma-separated platform-operator user ids (`ADMIN_USER_IDS`), e.g. "usr_123,usr_456".
