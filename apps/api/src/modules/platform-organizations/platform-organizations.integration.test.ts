@@ -478,3 +478,75 @@ describe("POST /platform-organizations/:organizationId/ban and /unban", () => {
     expect(unbannedOrg?.suspendedAt).toBeNull();
   }, 25000);
 });
+
+describe("GET /platform-organizations/:organizationId", () => {
+  it("rejects an unauthenticated request", async () => {
+    const res = await fetch(`http://localhost:${PORT}/platform-organizations/some-id`, {
+      headers: { Origin: ORIGIN },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a regular user with no platform role", async () => {
+    const regular = await signUp(`platform-org-detail-regular-${Date.now()}@example.com`);
+    cleanupUserIds.push(regular.userId);
+
+    const res = await fetch(`http://localhost:${PORT}/platform-organizations/some-id`, {
+      headers: { Origin: ORIGIN, Cookie: regular.cookie },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 404 for a nonexistent organization", async () => {
+    const admin = await createPlatformAccount("admin", "platform-org-detail-404-admin");
+    cleanupUserIds.push(admin.userId);
+
+    const res = await fetch(`http://localhost:${PORT}/platform-organizations/does-not-exist`, {
+      headers: { Origin: ORIGIN, Cookie: admin.cookie },
+    });
+    expect(res.status).toBe(404);
+  }, 15000);
+
+  it('lets a user.role:"support" account view detail too (read-only tier), including every member (not just the owner)', async () => {
+    const support = await createPlatformAccount("support", "platform-org-detail-support");
+    cleanupUserIds.push(support.userId);
+
+    const owner = await signUp(`platform-org-detail-owner-${Date.now()}@example.com`);
+    cleanupUserIds.push(owner.userId);
+    const orgId = await createOrg(owner.cookie, "Detail Org");
+    cleanupOrgIds.push(orgId);
+
+    const memberEmail = `platform-org-detail-member-${Date.now()}@example.com`;
+    const memberAccount = await signUp(memberEmail);
+    cleanupUserIds.push(memberAccount.userId);
+    await auth.api.addMember({
+      body: { userId: memberAccount.userId, role: "member", organizationId: orgId },
+    });
+
+    const res = await fetch(`http://localhost:${PORT}/platform-organizations/${orgId}`, {
+      headers: { Origin: ORIGIN, Cookie: support.cookie },
+    });
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as {
+      data: {
+        id: string;
+        name: string;
+        orgNumber: string | null;
+        suspended: boolean | null;
+        members: { userId: string; email: string; role: string }[];
+      };
+    };
+    expect(body.data.id).toBe(orgId);
+    expect(body.data.name).toBe("Detail Org");
+    expect(body.data.orgNumber).not.toBeNull();
+    expect(body.data.suspended).toBe(false);
+    expect(body.data.members).toHaveLength(2);
+    expect(body.data.members.some((m) => m.userId === owner.userId && m.role === "owner")).toBe(
+      true,
+    );
+    expect(body.data.members.some((m) => m.email === memberEmail && m.role === "member")).toBe(
+      true,
+    );
+  }, 20000);
+});

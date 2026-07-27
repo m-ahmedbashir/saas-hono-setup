@@ -4,6 +4,7 @@ import type {
   PlatformOrganizationsResponse,
   CreatePlatformOrganizationPayload,
   CreatePlatformOrganizationResult,
+  PlatformOrganizationDetail,
 } from "./types";
 
 interface SuspensionResult {
@@ -49,5 +50,14 @@ export async function banOrganization(
 export async function unbanOrganization(organizationId: string): Promise<SuspensionResult> {
   return apiFetch<SuspensionResult>(`/platform-organizations/${organizationId}/unban`, {
     method: "POST",
+  });
+}
+
+export async function getPlatformOrganizationDetail(
+  organizationId: string,
+  headers?: HeadersInit,
+): Promise<PlatformOrganizationDetail> {
+  return apiFetch<PlatformOrganizationDetail>(`/platform-organizations/${organizationId}`, {
+    headers,
   });
 }

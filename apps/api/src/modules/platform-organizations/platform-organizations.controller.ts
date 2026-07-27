@@ -6,6 +6,7 @@ import {
   createPlatformOrganization,
   banPlatformOrganization,
   unbanPlatformOrganization,
+  getPlatformOrganizationDetail,
 } from "./platform-organizations.service";
 import type {
   listPlatformOrganizationsQuerySchema,
@@ -51,4 +52,11 @@ export async function unbanPlatformOrganizationHandler(c: Context) {
   await unbanPlatformOrganization(organizationId);
 
   return success(c, { organizationId, suspended: false });
+}
+
+export async function getPlatformOrganizationDetailHandler(c: Context) {
+  const organizationId = c.req.param("organizationId")!;
+  const result = await getPlatformOrganizationDetail(organizationId);
+
+  return success(c, result);
 }

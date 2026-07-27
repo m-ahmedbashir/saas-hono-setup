@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Icons } from "@/components/icons";
 import type { PlatformOrganization } from "../../api/types";
@@ -16,10 +17,13 @@ export const columns: ColumnDef<PlatformOrganization>[] = [
     accessorKey: "name",
     header: "Name",
     cell: ({ row }) => (
-      <div className="flex flex-col">
-        <span className="font-medium">{row.original.name}</span>
+      <Link
+        href={`/dashboard/organizations/${row.original.id}`}
+        className="focus-visible:ring-ring flex flex-col rounded focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+      >
+        <span className="font-medium hover:underline">{row.original.name}</span>
         <span className="text-muted-foreground text-xs">{row.original.slug}</span>
-      </div>
+      </Link>
     ),
     meta: {
       label: "Name",

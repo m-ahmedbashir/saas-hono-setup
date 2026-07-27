@@ -135,6 +135,109 @@ export async function setOrganizationSuspension(
     .where(eq(organizationProfile.organizationId, organizationId));
 }
 
+export interface PlatformOrganizationDetailRow {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Date;
+  suspended: boolean | null;
+  suspendedAt: Date | null;
+  suspensionReason: string | null;
+  plan: string | null;
+  subscriptionStatus: string | null;
+  seatQuantity: number | null;
+  providerCustomerId: string | null;
+  providerSubscriptionId: string | null;
+  orgNumber: string | null;
+  industry: string | null;
+  companySize: string | null;
+  website: string | null;
+  phone: string | null;
+  taxId: string | null;
+  description: string | null;
+  addressStreet: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressPostalCode: string | null;
+  addressCountry: string | null;
+}
+
+// One row, not paginated — a detail page can afford the full profile/billing shape
+// (address, description, raw Stripe ids) that listOrganizationsPage deliberately
+// leaves out of the summary row shown for every org in the list.
+export async function getOrganizationDetail(
+  tx: DbExecutor,
+  organizationId: string,
+): Promise<PlatformOrganizationDetailRow | undefined> {
+  const [row] = await tx
+    .select({
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      createdAt: organization.createdAt,
+      suspended: organizationProfile.suspended,
+      suspendedAt: organizationProfile.suspendedAt,
+      suspensionReason: organizationProfile.suspensionReason,
+      plan: organizationBilling.plan,
+      subscriptionStatus: organizationBilling.subscriptionStatus,
+      seatQuantity: organizationBilling.seatQuantity,
+      providerCustomerId: organizationBilling.providerCustomerId,
+      providerSubscriptionId: organizationBilling.providerSubscriptionId,
+      orgNumber: organizationProfile.orgNumber,
+      industry: organizationProfile.industry,
+      companySize: organizationProfile.companySize,
+      website: organizationProfile.website,
+      phone: organizationProfile.phone,
+      taxId: organizationProfile.taxId,
+      description: organizationProfile.description,
+      addressStreet: organizationProfile.addressStreet,
+      addressCity: organizationProfile.addressCity,
+      addressState: organizationProfile.addressState,
+      addressPostalCode: organizationProfile.addressPostalCode,
+      addressCountry: organizationProfile.addressCountry,
+    })
+    .from(organization)
+    .leftJoin(organizationBilling, eq(organizationBilling.organizationId, organization.id))
+    .leftJoin(organizationProfile, eq(organizationProfile.organizationId, organization.id))
+    .where(eq(organization.id, organizationId));
+
+  return row;
+}
+
+export interface OrganizationMemberRow {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  banned: boolean | null;
+  role: string;
+  joinedAt: Date;
+}
+
+// Every member, not just the owner — unlike getOwnersAndMemberCounts (list rows only
+// need the owner + a count), a detail page is the "who's in this org" view.
+export async function getOrganizationMembers(
+  tx: DbExecutor,
+  organizationId: string,
+): Promise<OrganizationMemberRow[]> {
+  return tx
+    .select({
+      id: member.id,
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      emailVerified: user.emailVerified,
+      banned: user.banned,
+      role: member.role,
+      joinedAt: member.createdAt,
+    })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(eq(member.organizationId, organizationId))
+    .orderBy(desc(member.createdAt));
+}
+
 export interface OrganizationOwnerAndMemberCount {
   organizationId: string;
   ownerName: string | null;

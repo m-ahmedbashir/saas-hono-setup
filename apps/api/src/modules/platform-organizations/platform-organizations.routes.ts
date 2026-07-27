@@ -14,6 +14,7 @@ import {
   createPlatformOrganizationHandler,
   banPlatformOrganizationHandler,
   unbanPlatformOrganizationHandler,
+  getPlatformOrganizationDetailHandler,
 } from "./platform-organizations.controller";
 
 // Same re-throw-through-AppError pattern as every other validated route in this repo
@@ -53,6 +54,14 @@ export const platformOrganizationsRoutes = new Hono()
     requirePlatformPermission({ organization: ["list"] }),
     validateListQuery,
     listPlatformOrganizationsHandler,
+  )
+  // Same permission tier as the list route — viewing one org's detail is the same
+  // read-only oversight action as listing many, not a distinct capability.
+  .get(
+    "/:organizationId",
+    injectUserContext,
+    requirePlatformPermission({ organization: ["list"] }),
+    getPlatformOrganizationDetailHandler,
   )
   .post(
     "/",

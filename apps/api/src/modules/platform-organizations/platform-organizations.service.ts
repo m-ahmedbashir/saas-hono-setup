@@ -8,6 +8,8 @@ import {
   organizationSlugExists,
   organizationExists,
   setOrganizationSuspension,
+  getOrganizationDetail,
+  getOrganizationMembers,
 } from "./platform-organizations.db";
 import type { CreatePlatformOrganizationBody } from "./platform-organizations.schema";
 
@@ -176,5 +178,59 @@ export async function unbanPlatformOrganization(organizationId: string): Promise
       throw new AppError("NOT_FOUND", "Organization not found");
     }
     await setOrganizationSuspension(tx, organizationId, false, null);
+  });
+}
+
+export interface PlatformOrganizationMember {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  banned: boolean | null;
+  role: string;
+  joinedAt: Date;
+}
+
+export interface PlatformOrganizationDetail {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Date;
+  suspended: boolean | null;
+  suspendedAt: Date | null;
+  suspensionReason: string | null;
+  plan: string | null;
+  subscriptionStatus: string | null;
+  seatQuantity: number | null;
+  providerCustomerId: string | null;
+  providerSubscriptionId: string | null;
+  orgNumber: string | null;
+  industry: string | null;
+  companySize: string | null;
+  website: string | null;
+  phone: string | null;
+  taxId: string | null;
+  description: string | null;
+  addressStreet: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressPostalCode: string | null;
+  addressCountry: string | null;
+  members: PlatformOrganizationMember[];
+}
+
+// Same withSystemScope reasoning as listPlatformOrganizations — a platform-admin read
+// across an arbitrary org, not scoped to the caller's own active org.
+export async function getPlatformOrganizationDetail(
+  organizationId: string,
+): Promise<PlatformOrganizationDetail> {
+  return withSystemScope(async (tx) => {
+    const detail = await getOrganizationDetail(tx, organizationId);
+    if (!detail) {
+      throw new AppError("NOT_FOUND", "Organization not found");
+    }
+    const members = await getOrganizationMembers(tx, organizationId);
+    return { ...detail, members };
   });
 }
