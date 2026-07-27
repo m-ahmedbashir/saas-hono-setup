@@ -2,6 +2,68 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.18.0] — 2026-07-25
+
+### Added
+
+- Platform employees feature — a platform admin can now add other staff directly (`authClient.admin.createUser`, no self-signup/invite-email flow), assign one of two roles (`admin`, `support`), and change role/ban/unban/remove from `apps/web`'s `/dashboard/users` page. Two platform roles now exist: `admin` (full access, identical to Better Auth's own default admin permissions) and `support` (read-only — list/view users only). Page is gated client-side to these two roles via `PlatformAccessGate`; the real enforcement stays server-side on every `authClient.admin.*` call.
+
+### Changed
+
+- `packages/core/src/auth/index.ts`'s `admin` plugin config now passes a custom `roles`/`ac` (`platform-permissions.ts`) instead of relying on the plugin's built-in defaults — required to add the `support` tier. Verified this exactly replicates the existing default admin role's permissions so the already-bootstrapped admin account keeps identical access, not a silent downgrade.
+- `apps/web`'s `/dashboard/users` (`src/features/users/`) fully replaced the template's fake in-memory user data with real `authClient.admin.*` calls. Deleted the now-dead `app/api/users/**` route handlers; `src/constants/mock-api-users.ts` now only exports `delay` (still used by the overview dashboard's mock chart pages).
+
+## [0.17.0] — 2026-07-25
+
+### Fixed
+
+- Shared `Form` component (`apps/web/src/components/ui/tanstack-form.tsx`) was silently discarding any custom `className` passed to it — `{...props}` spread after the merged `className`, and `className` was never excluded from `props`'s type, so React's prop resolution let the raw value win. Affected every form in the app; margin/gap utilities on any `form.Form` had zero effect.
+
+### Added
+
+- `pnpm --filter @repo/api seed:admin` (`apps/api/scripts/seed-admin.ts`) — idempotent platform-admin seeding from `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD`/`SEED_ADMIN_NAME`, an operator-friendly alternative to `ADMIN_USER_IDS`.
+
+### Verified
+
+- Sign-in flow confirmed working end-to-end against the real dev servers (not just the test suite): real sign-up/sign-in through the exact endpoints `authClient` uses, CORS genuinely exercised with a real `Origin` header, session cookie authenticates a real route, wrong password correctly rejected.
+
+## [0.16.0] — 2026-07-25
+
+### Fixed
+
+- A Zod `.default()` on a field TanStack Form's `defaultValues` already supplies (`rememberMe`) was silently breaking `next build`'s type-check.
+- Shared `CheckboxField` label had no `htmlFor`, so clicking "Remember me"'s label text didn't toggle the checkbox — only the small checkbox itself did.
+
+### Changed
+
+- Icon-affordance and password-visibility-toggle support moved into the shared `TextField`/`FormTextField` (new optional `icon`/`labelSuffix` props) instead of living as feature-local duplicates in the sign-in form. Existing plain text fields elsewhere are unaffected (same markup as before). `sign-in-view.tsx` now composes only prebuilt field components.
+
+## [0.15.0] — 2026-07-25
+
+### Added
+
+- `apps/web/src/lib/api-client.ts` — shared `apiFetch<T>` for calling `apps/api`, replacing the template's original stub. Matches the real success/failure envelope, throws a typed `ApiError` (`code`/`message`/`status`) instead of a bare `Error`. Built test-first (`api-client.test.ts`).
+
+### Changed
+
+- Sign-in form (`/auth/sign-in`) redesigned: icon-affordance inputs, password show/hide toggle, autofocus/placeholder/autocomplete polish, loading-aware submit label, and a corrected mobile layout (the first pass's aesthetic redesign only showed at desktop width, leaving mobile as a bare, unstyled form).
+
+### Housekeeping
+
+- Mirrored a repo-root skill (`nextjs-shadcn-frontend`) from `.agents/skills/` into `.claude/skills/` — the latter is what this harness actually scans for slash-invokable skills; every other skill in the repo already existed in both.
+
+## [0.14.0] — 2026-07-25
+
+### Fixed
+
+- `apps/web`'s `src/proxy.ts` was a no-op left over from the Clerk removal — the dashboard was reachable with no login at all. Now redirects unauthenticated `/dashboard/**` requests to `/auth/sign-in` (and an authenticated session away from `/auth/**` to `/dashboard/overview`), via `getSessionCookie` (`better-auth/cookies`). Built test-first, `proxy.test.ts`. See `AGENTS.md`'s "apps/web" section — including a correction of a wrong claim in the `next-best-practices` skill about the config export name.
+
+## [0.13.0] — 2026-07-25
+
+### Added
+
+- `apps/web` — a Next.js 16 + shadcn/ui admin dashboard, vendored from [next-shadcn-dashboard-starter](https://github.com/Kiranism/next-shadcn-dashboard-starter) (MIT) and adapted into this monorepo: Clerk/Sentry/kanban/chat/demo-examples removed via the template's own cleanup tool, package renamed `@repo/web` and wired into the pnpm workspace (own `eslint.config.mjs` hand-built around `eslint-plugin-react`'s ESLint-10 incompatibility, `.gitignore` trimmed to what root doesn't already cover), Vitest + React Testing Library added for component tests. First real feature: `/auth/sign-in`, built test-first against Better Auth's own React client (`src/lib/auth-client.ts`) — no Next.js API-route proxy in between, straight `fetch` to `apps/api`. See `AGENTS.md`'s new "apps/web" section.
+
 ## [0.12.0] — 2026-07-25
 
 ### Added
