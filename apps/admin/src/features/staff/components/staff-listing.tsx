@@ -2,10 +2,10 @@ import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { cookies } from "next/headers";
 import { getQueryClient } from "@/lib/query-client";
 import { searchParamsCache } from "@/lib/searchparams";
-import { usersQueryOptions } from "../api/queries";
-import { UsersTable } from "./users-table";
+import { staffQueryOptions } from "../api/queries";
+import { StaffTable } from "./staff-table";
 
-export default async function UserListingPage() {
+export default async function StaffListingPage() {
   const page = searchParamsCache.get("page");
   const search = searchParamsCache.get("name");
   const pageLimit = searchParamsCache.get("perPage");
@@ -13,7 +13,7 @@ export default async function UserListingPage() {
 
   // Sort isn't included in this server-side prefetch (unlike page/search/role) — parsing
   // the URL's sort-state array server-side would duplicate getSortingStateParser's logic
-  // for no real benefit. The client's useSuspenseQuery in users-table/index.tsx builds
+  // for no real benefit. The client's useSuspenseQuery in staff-table/index.tsx builds
   // the real filters (including sort) and refetches once mounted if the initial URL had
   // a sort applied; the only cost is one extra request in that specific case, not
   // incorrect data.
@@ -34,12 +34,12 @@ export default async function UserListingPage() {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
   if (cookieHeader) {
-    void queryClient.prefetchQuery(usersQueryOptions(filters, { Cookie: cookieHeader }));
+    void queryClient.prefetchQuery(staffQueryOptions(filters, { Cookie: cookieHeader }));
   }
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <UsersTable />
+      <StaffTable />
     </HydrationBoundary>
   );
 }

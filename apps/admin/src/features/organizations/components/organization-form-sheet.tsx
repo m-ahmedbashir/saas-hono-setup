@@ -26,7 +26,7 @@ interface OrganizationFormSheetProps {
 }
 
 // Provisions a brand-new owner account for a company that doesn't have one yet — not
-// an "attach existing user" flow. Mirrors features/users' "Add Employee" sheet: the
+// an "attach existing user" flow. Mirrors features/staff's "Add Employee" sheet: the
 // admin sets the owner's password here and shares it with the company out of band,
 // there's no invite-email flow anywhere in this repo to build on top of.
 export function OrganizationFormSheet({ open, onOpenChange }: OrganizationFormSheetProps) {

@@ -47,10 +47,10 @@ export const navGroups: NavGroup[] = [
       },
 
       {
-        title: "Users",
-        url: "/dashboard/users",
+        title: "Staff",
+        url: "/dashboard/staff",
         icon: "teams",
-        shortcut: ["u", "u"],
+        shortcut: ["s", "s"],
         isActive: false,
         items: [],
       },

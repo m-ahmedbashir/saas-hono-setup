@@ -9,7 +9,7 @@ const PLATFORM_ROLES = new Set(["admin", "support"]);
 
 // Client-side only — a UX convenience (don't show the page/nav flash to someone who'll
 // just get 403s from every real action), not the actual security boundary. That's each
-// route's own server-side check (Better Auth's admin plugin for /dashboard/users,
+// route's own server-side check (Better Auth's admin plugin for /dashboard/staff,
 // requirePlatformPermission for /dashboard/organizations), already enforced regardless
 // of whether this gate exists at all. See AGENTS.md's Platform admin section on the
 // admin/support role split. Shared by both platform-admin pages rather than duplicated

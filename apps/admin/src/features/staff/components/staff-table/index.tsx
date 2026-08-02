@@ -6,12 +6,12 @@ import { useDataTable } from "@/hooks/use-data-table";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { getSortingStateParser } from "@/lib/parsers";
-import { usersQueryOptions } from "../../api/queries";
+import { staffQueryOptions } from "../../api/queries";
 import { columns } from "./columns";
 
 const columnIds = columns.map((c) => c.id).filter(Boolean) as string[];
 
-export function UsersTable() {
+export function StaffTable() {
   const [params] = useQueryStates({
     page: parseAsInteger.withDefault(1),
     perPage: parseAsInteger.withDefault(10),
@@ -31,12 +31,12 @@ export function UsersTable() {
       ({ sortBy: firstSort.id, sortDirection: firstSort.desc ? "desc" : "asc" } as const)),
   };
 
-  const { data } = useSuspenseQuery(usersQueryOptions(filters));
+  const { data } = useSuspenseQuery(staffQueryOptions(filters));
 
   const pageCount = Math.ceil(data.total / params.perPage);
 
   const { table } = useDataTable({
-    data: data.users,
+    data: data.staff,
     columns,
     pageCount,
     shallow: true,
@@ -53,7 +53,7 @@ export function UsersTable() {
   );
 }
 
-export function UsersTableSkeleton() {
+export function StaffTableSkeleton() {
   return (
     <div className="flex flex-1 animate-pulse flex-col gap-4">
       <div className="bg-muted h-10 w-full rounded" />

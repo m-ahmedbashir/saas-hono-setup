@@ -1,17 +1,17 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
 import { DataTableColumnHeader } from "@/components/ui/table/data-table-column-header";
-import type { PlatformUser } from "../../api/types";
+import type { PlatformStaff } from "../../api/types";
 import { Column, ColumnDef } from "@tanstack/react-table";
 import { Icons } from "@/components/icons";
 import { CellAction } from "./cell-action";
 import { ROLE_OPTIONS } from "./options";
 
-export const columns: ColumnDef<PlatformUser>[] = [
+export const columns: ColumnDef<PlatformStaff>[] = [
   {
     id: "name",
     accessorKey: "name",
-    header: ({ column }: { column: Column<PlatformUser, unknown> }) => (
+    header: ({ column }: { column: Column<PlatformStaff, unknown> }) => (
       <DataTableColumnHeader column={column} title="Name" />
     ),
     cell: ({ row }) => (
@@ -32,7 +32,7 @@ export const columns: ColumnDef<PlatformUser>[] = [
     id: "emailVerified",
     accessorKey: "emailVerified",
     enableSorting: false,
-    header: ({ column }: { column: Column<PlatformUser, unknown> }) => (
+    header: ({ column }: { column: Column<PlatformStaff, unknown> }) => (
       <DataTableColumnHeader column={column} title="Email" />
     ),
     cell: ({ row }) => {
@@ -50,11 +50,11 @@ export const columns: ColumnDef<PlatformUser>[] = [
     id: "role",
     accessorKey: "role",
     enableSorting: false,
-    header: ({ column }: { column: Column<PlatformUser, unknown> }) => (
+    header: ({ column }: { column: Column<PlatformStaff, unknown> }) => (
       <DataTableColumnHeader column={column} title="Role" />
     ),
     cell: ({ cell }) => {
-      const role = cell.getValue<PlatformUser["role"]>();
+      const role = cell.getValue<PlatformStaff["role"]>();
       return role ? (
         <Badge variant="outline" className="capitalize">
           {role}
@@ -86,11 +86,11 @@ export const columns: ColumnDef<PlatformUser>[] = [
   {
     id: "createdAt",
     accessorKey: "createdAt",
-    header: ({ column }: { column: Column<PlatformUser, unknown> }) => (
+    header: ({ column }: { column: Column<PlatformStaff, unknown> }) => (
       <DataTableColumnHeader column={column} title="Added" />
     ),
     cell: ({ cell }) => {
-      const value = cell.getValue<PlatformUser["createdAt"]>();
+      const value = cell.getValue<PlatformStaff["createdAt"]>();
       return (
         <span className="text-muted-foreground text-sm">
           {new Date(value).toLocaleDateString()}
@@ -101,11 +101,11 @@ export const columns: ColumnDef<PlatformUser>[] = [
   {
     id: "updatedAt",
     accessorKey: "updatedAt",
-    header: ({ column }: { column: Column<PlatformUser, unknown> }) => (
+    header: ({ column }: { column: Column<PlatformStaff, unknown> }) => (
       <DataTableColumnHeader column={column} title="Updated" />
     ),
     cell: ({ cell }) => {
-      const value = cell.getValue<PlatformUser["updatedAt"]>();
+      const value = cell.getValue<PlatformStaff["updatedAt"]>();
       return (
         <span className="text-muted-foreground text-sm">
           {new Date(value).toLocaleDateString()}

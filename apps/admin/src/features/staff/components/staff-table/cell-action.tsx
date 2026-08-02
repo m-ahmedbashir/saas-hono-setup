@@ -11,19 +11,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  setUserRoleMutation,
-  banUserMutation,
-  unbanUserMutation,
-  removeUserMutation,
+  setStaffRoleMutation,
+  banStaffMemberMutation,
+  unbanStaffMemberMutation,
+  removeStaffMemberMutation,
 } from "../../api/mutations";
-import type { PlatformUser } from "../../api/types";
+import type { PlatformStaff } from "../../api/types";
 import { Icons } from "@/components/icons";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 interface CellActionProps {
-  data: PlatformUser;
+  data: PlatformStaff;
 }
 
 export function CellAction({ data }: CellActionProps) {
@@ -31,13 +31,13 @@ export function CellAction({ data }: CellActionProps) {
   const [banOpen, setBanOpen] = useState(false);
 
   const setRole = useMutation({
-    ...setUserRoleMutation,
+    ...setStaffRoleMutation,
     onSuccess: () => toast.success(`Role updated for ${data.name}`),
     onError: () => toast.error("Failed to update role"),
   });
 
   const ban = useMutation({
-    ...banUserMutation,
+    ...banStaffMemberMutation,
     onSuccess: () => {
       toast.success(`${data.name} has been banned`);
       setBanOpen(false);
@@ -46,13 +46,13 @@ export function CellAction({ data }: CellActionProps) {
   });
 
   const unban = useMutation({
-    ...unbanUserMutation,
+    ...unbanStaffMemberMutation,
     onSuccess: () => toast.success(`${data.name} has been unbanned`),
     onError: () => toast.error("Failed to unban user"),
   });
 
   const remove = useMutation({
-    ...removeUserMutation,
+    ...removeStaffMemberMutation,
     onSuccess: () => {
       toast.success(`${data.name} has been removed`);
       setRemoveOpen(false);

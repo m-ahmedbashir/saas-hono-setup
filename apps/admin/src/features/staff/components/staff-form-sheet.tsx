@@ -15,10 +15,10 @@ import { Icons } from "@/components/icons";
 import { useMutation } from "@tanstack/react-query";
 import { createEmployeeMutation } from "../api/mutations";
 import { toast } from "sonner";
-import { createEmployeeSchema, type CreateEmployeeFormValues } from "../schemas/user";
-import { ROLE_OPTIONS } from "./users-table/options";
+import { createEmployeeSchema, type CreateEmployeeFormValues } from "../schemas/staff";
+import { ROLE_OPTIONS } from "./staff-table/options";
 
-interface UserFormSheetProps {
+interface StaffFormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -27,8 +27,8 @@ interface UserFormSheetProps {
 // section, the admin sets the initial password and shares it out of band; there's no
 // email-sending infrastructure anywhere in this repo to build a real invite-link flow
 // on top of). Editing an existing employee's role/ban status happens via
-// users-table/cell-action.tsx instead, not here.
-export function UserFormSheet({ open, onOpenChange }: UserFormSheetProps) {
+// staff-table/cell-action.tsx instead, not here.
+export function StaffFormSheet({ open, onOpenChange }: StaffFormSheetProps) {
   const createMutation = useMutation({
     ...createEmployeeMutation,
     onSuccess: () => {
@@ -67,7 +67,7 @@ export function UserFormSheet({ open, onOpenChange }: UserFormSheetProps) {
 
         <div className="flex-1 overflow-auto">
           <form.AppForm>
-            <form.Form id="user-form-sheet" className="space-y-4">
+            <form.Form id="staff-form-sheet" className="space-y-4">
               <FormTextField name="name" label="Name" required placeholder="Jane Doe" />
 
               <FormTextField
@@ -104,7 +104,7 @@ export function UserFormSheet({ open, onOpenChange }: UserFormSheetProps) {
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" form="user-form-sheet" isLoading={createMutation.isPending}>
+          <Button type="submit" form="staff-form-sheet" isLoading={createMutation.isPending}>
             <Icons.check /> Add Employee
           </Button>
         </SheetFooter>
@@ -113,7 +113,7 @@ export function UserFormSheet({ open, onOpenChange }: UserFormSheetProps) {
   );
 }
 
-export function UserFormSheetTrigger() {
+export function StaffFormSheetTrigger() {
   const [open, setOpen] = useState(false);
 
   return (
@@ -121,7 +121,7 @@ export function UserFormSheetTrigger() {
       <Button onClick={() => setOpen(true)}>
         <Icons.add className="mr-2 h-4 w-4" /> Add Employee
       </Button>
-      <UserFormSheet open={open} onOpenChange={setOpen} />
+      <StaffFormSheet open={open} onOpenChange={setOpen} />
     </>
   );
 }

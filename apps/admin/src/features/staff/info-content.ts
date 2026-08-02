@@ -1,7 +1,7 @@
 import type { InfobarContent } from "@/components/ui/infobar";
 
-export const usersInfoContent: InfobarContent = {
-  title: "Platform Users",
+export const staffInfoContent: InfobarContent = {
+  title: "Platform Staff",
   sections: [
     {
       title: "Overview",

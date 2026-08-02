@@ -10,9 +10,9 @@ import { authClient } from "@/lib/auth-client";
 import type {
   CreateEmployeePayload,
   PlatformRole,
-  PlatformUser,
-  UserFilters,
-  UsersResponse,
+  PlatformStaff,
+  PlatformStaffFilters,
+  PlatformStaffResponse,
 } from "./types";
 
 // authClient methods resolve { data, error } — never throw for expected failures, same
@@ -28,10 +28,10 @@ function unwrap<T>(result: { data: T | null; error: { message?: string } | null 
   return result.data;
 }
 
-export async function getUsers(
-  filters: UserFilters,
+export async function getStaff(
+  filters: PlatformStaffFilters,
   headers?: HeadersInit,
-): Promise<UsersResponse> {
+): Promise<PlatformStaffResponse> {
   const limit = filters.limit ?? 10;
   const offset = ((filters.page ?? 1) - 1) * limit;
 
@@ -49,7 +49,7 @@ export async function getUsers(
         // Better Auth assigns every regular signup/org-member by default. Without this,
         // authClient.admin.listUsers returns literally every account in the system
         // (Better Auth has no concept of "platform" vs "regular" user, only this app's
-        // role split does), which is exactly wrong for a page titled "Platform Users."
+        // role split does), which is exactly wrong for a page titled "Platform Staff."
         // A facet pick of one specific role (filters.role) narrows further via `eq`;
         // otherwise `in` scopes to the whole platform-staff set. `in`/`filterValue` as
         // an array is a real, fully-implemented adapter operator (`inArray` under the
@@ -71,35 +71,35 @@ export async function getUsers(
   );
 
   const data = unwrap(result);
-  return { users: data.users as unknown as PlatformUser[], total: data.total };
+  return { staff: data.users as unknown as PlatformStaff[], total: data.total };
 }
 
-export async function createEmployee(payload: CreateEmployeePayload): Promise<PlatformUser> {
+export async function createEmployee(payload: CreateEmployeePayload): Promise<PlatformStaff> {
   const result = await authClient.admin.createUser({
     name: payload.name,
     email: payload.email,
     password: payload.password,
     role: payload.role,
   });
-  return unwrap(result).user as unknown as PlatformUser;
+  return unwrap(result).user as unknown as PlatformStaff;
 }
 
-export async function setUserRole(userId: string, role: PlatformRole): Promise<void> {
+export async function setStaffRole(userId: string, role: PlatformRole): Promise<void> {
   const result = await authClient.admin.setRole({ userId, role });
   unwrap(result);
 }
 
-export async function banUser(userId: string, banReason?: string): Promise<void> {
+export async function banStaffMember(userId: string, banReason?: string): Promise<void> {
   const result = await authClient.admin.banUser({ userId, banReason });
   unwrap(result);
 }
 
-export async function unbanUser(userId: string): Promise<void> {
+export async function unbanStaffMember(userId: string): Promise<void> {
   const result = await authClient.admin.unbanUser({ userId });
   unwrap(result);
 }
 
-export async function removeUser(userId: string): Promise<void> {
+export async function removeStaffMember(userId: string): Promise<void> {
   const result = await authClient.admin.removeUser({ userId });
   unwrap(result);
 }
