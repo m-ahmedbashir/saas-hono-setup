@@ -391,6 +391,44 @@ export const subscriptionPlansRelations = relations(subscriptionPlans, ({ one })
   }),
 }));
 
+// Persisted, per-user notification inbox — the durability half of the notification
+// system (see specs/notifications-plan.md). Real-time delivery (the WebSocket
+// dispatcher, apps/api/src/modules/notifications/channels/websocket-channel.ts) is a
+// best-effort convenience on top of this; this row is what guarantees a notification
+// is never lost just because its recipient wasn't online when it fired. FK'd to
+// `user.id` directly — works identically for an individual, an org member, or platform
+// staff, since Better Auth's `user` table already unifies all three (no per-audience
+// notification table needed).
+export const notification = pgTable(
+  "notification",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    // Where clicking the notification should take you — e.g. the organization/billing
+    // page the event concerns. Nullable: not every notification needs a destination.
+    actionUrl: text("action_url"),
+    read: boolean("read").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("notification_userId_idx").on(table.userId),
+    // Backs the unread-count/unread-list queries specifically — the vast majority of
+    // reads against this table are "my unread notifications," not "all of them".
+    index("notification_userId_read_idx").on(table.userId, table.read),
+  ],
+);
+
+export const notificationRelations = relations(notification, ({ one }) => ({
+  user: one(user, {
+    fields: [notification.userId],
+    references: [user.id],
+  }),
+}));
+
 // Not a Better Auth-generated table — hand-written, own table rather than columns on
 // `user` for the same reason as organizationBilling/individualBilling: `user` is
 // generated and would drift on the next `@better-auth/cli generate` run. One row per

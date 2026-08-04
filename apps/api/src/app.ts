@@ -14,7 +14,10 @@ import { platformOrganizationsRoutes } from "./modules/platform-organizations/pl
 import { platformIndividualsRoutes } from "./modules/platform-individuals/platform-individuals.routes";
 import { subscriptionPlansRoutes } from "./modules/subscription-plans/subscription-plans.routes";
 import { accountRoutes } from "./modules/account/account.routes";
-import { createNotificationsRoutes } from "./modules/notifications/notifications.routes";
+import {
+  createNotificationsRoutes,
+  notificationsRoutes,
+} from "./modules/notifications/notifications.routes";
 import { allowedOrigins } from "./lib/allowed-origins";
 import { failure } from "./lib/response";
 import { healthCheckHandler, notFoundHandler, globalErrorHandler } from "./lib/app-handlers";
@@ -55,6 +58,7 @@ export const app = new Hono()
   .route("/platform-organizations", platformOrganizationsRoutes)
   .route("/platform-individuals", platformIndividualsRoutes)
   .route("/subscription-plans", subscriptionPlansRoutes)
+  .route("/notifications", notificationsRoutes)
   .route("/account", accountRoutes);
 
 export const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });

@@ -43,6 +43,7 @@ export async function closePool(): Promise<void> {
 
 export * from "./schema";
 export * from "./organization-profile";
+export * from "./notifications";
 export {
   eq,
   ne,
