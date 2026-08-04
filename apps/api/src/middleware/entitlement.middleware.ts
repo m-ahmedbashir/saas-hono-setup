@@ -1,15 +1,13 @@
 import { createMiddleware } from "hono/factory";
 import { withOrgScope, withUserScope } from "@repo/db";
-import {
-  AppError,
-  canAccessFeature,
-  type FeatureKey,
-  type OrganizationPlanId,
-  type IndividualPlanId,
-} from "@repo/core";
+import { AppError, canAccessFeature, type FeatureKey } from "@repo/core";
 import { requireOrgContext } from "./auth.middleware";
 import { getBillingByOrgId } from "../modules/billing/organization-billing.db";
 import { getUserBillingByUserId } from "../modules/billing/individual-billing.db";
+import {
+  resolveEntitlementsForPlan,
+  getDefaultPlanId,
+} from "../modules/subscription-plans/subscription-plans.service";
 
 /**
  * The one entitlement gate for the whole app, for either billing universe — see
@@ -52,17 +50,21 @@ async function organizationHasFeature(
   organizationId: string,
   feature: FeatureKey,
 ): Promise<boolean> {
-  const planId = await withOrgScope(organizationId, async (tx) => {
+  const existingPlanId = await withOrgScope(organizationId, async (tx) => {
     const row = await getBillingByOrgId(tx, organizationId);
-    return (row?.plan as OrganizationPlanId | undefined) ?? "free";
+    return row?.plan;
   });
-  return canAccessFeature({ ownerType: "organization", planId }, feature);
+  const planId = existingPlanId ?? (await getDefaultPlanId("organization"));
+  const entitlements = await resolveEntitlementsForPlan("organization", planId, organizationId);
+  return canAccessFeature(entitlements, feature);
 }
 
 async function individualHasFeature(userId: string, feature: FeatureKey): Promise<boolean> {
-  const planId = await withUserScope(userId, async (tx) => {
+  const existingPlanId = await withUserScope(userId, async (tx) => {
     const row = await getUserBillingByUserId(tx, userId);
-    return (row?.plan as IndividualPlanId | undefined) ?? "individual_free";
+    return row?.plan;
   });
-  return canAccessFeature({ ownerType: "individual", planId }, feature);
+  const planId = existingPlanId ?? (await getDefaultPlanId("individual"));
+  const entitlements = await resolveEntitlementsForPlan("individual", planId, null);
+  return canAccessFeature(entitlements, feature);
 }

@@ -1,7 +1,11 @@
 import { createMiddleware } from "hono/factory";
 import { member, eq, count, withOrgScope } from "@repo/db";
-import { AppError, organizationPlans, type OrganizationPlanId } from "@repo/core";
+import { AppError } from "@repo/core";
 import { getBillingByOrgId } from "../modules/billing/organization-billing.db";
+import {
+  getPlanForBilling,
+  getDefaultPlanId,
+} from "../modules/subscription-plans/subscription-plans.service";
 
 /**
  * Blocks an org-scoped action once active member count reaches the org's
@@ -25,7 +29,7 @@ export const enforceSeatLimit = createMiddleware(async (c, next) => {
   }
 
   const organizationId = userContext.organizationId;
-  const { planId, activeMembers } = await withOrgScope(organizationId, async (tx) => {
+  const { existingPlanId, activeMembers } = await withOrgScope(organizationId, async (tx) => {
     const billingRow = await getBillingByOrgId(tx, organizationId);
     const [row] = await tx
       .select({ activeMembers: count() })
@@ -33,11 +37,17 @@ export const enforceSeatLimit = createMiddleware(async (c, next) => {
       .where(eq(member.organizationId, organizationId));
 
     return {
-      planId: (billingRow?.plan as OrganizationPlanId | undefined) ?? "free",
+      existingPlanId: billingRow?.plan,
       activeMembers: row?.activeMembers ?? 0,
     };
   });
-  const seatLimit = organizationPlans[planId].seatLimit;
+  const planId = existingPlanId ?? (await getDefaultPlanId("organization"));
+
+  // A plan that can't be resolved at all gets the same conservative default as
+  // fallbackEntitlements' deny-most philosophy (entitlements.ts) — 0 seats, fail
+  // closed, rather than silently letting an unbounded number of members in.
+  const plan = await getPlanForBilling("organization", planId, organizationId);
+  const seatLimit = plan?.seatLimit ?? 0;
 
   if (activeMembers >= seatLimit) {
     throw new AppError(

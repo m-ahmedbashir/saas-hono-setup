@@ -1,4 +1,4 @@
-import { organizationBilling, eq, type DbExecutor } from "@repo/db";
+import { organizationBilling, eq, count, type DbExecutor } from "@repo/db";
 import type { OrganizationPlanId, SubscriptionStatus } from "@repo/core";
 
 // Every function here requires an explicit `tx` — a `withOrgScope`/`withSystemScope`
@@ -55,4 +55,13 @@ export async function updateBillingBySubscriptionId(
     .update(organizationBilling)
     .set(values)
     .where(eq(organizationBilling.providerSubscriptionId, providerSubscriptionId));
+}
+
+/** Backs subscription-plans.service.ts's `activeSubscriberCount` — how many orgs currently have this plan string on their billing row, regardless of subscriptionStatus (matches "who would be affected by editing this plan," not just "who's actively paying"). */
+export async function countByPlan(tx: DbExecutor, plan: string): Promise<number> {
+  const [row] = await tx
+    .select({ value: count() })
+    .from(organizationBilling)
+    .where(eq(organizationBilling.plan, plan));
+  return row?.value ?? 0;
 }

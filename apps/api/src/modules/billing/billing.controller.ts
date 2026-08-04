@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { requireOrgContext } from "../../middleware/auth.middleware";
 import { success } from "../../lib/response";
 import type { ValidatedJsonContext } from "../../lib/validated-context";
-import { billingService } from "./stripe-billing.service";
+import { createOrganizationCheckout, createIndividualCheckout } from "./billing.service";
 import { processWebhook } from "./billing.handlers";
 import type { checkoutRequestSchema, individualCheckoutRequestSchema } from "./billing.schema";
 
@@ -14,7 +14,7 @@ export async function organizationCheckoutHandler(
     "Checkout requires an active organization",
   );
   const { planId, quantity } = c.req.valid("json");
-  const { checkoutUrl } = await billingService.createCheckoutSession(
+  const { checkoutUrl } = await createOrganizationCheckout(
     userContext.organizationId,
     planId,
     quantity,
@@ -29,7 +29,7 @@ export async function individualCheckoutHandler(
 ) {
   const userContext = c.get("userContext");
   const { planId } = c.req.valid("json");
-  const { checkoutUrl } = await billingService.createIndividualCheckoutSession(
+  const { checkoutUrl } = await createIndividualCheckout(
     userContext.user.id,
     planId,
     c.req.header("Idempotency-Key"),
