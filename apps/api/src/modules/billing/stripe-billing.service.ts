@@ -1,13 +1,9 @@
 import Stripe from "stripe";
 import {
   AppError,
-  organizationPlans,
-  individualPlans,
   type BillingEvent,
   type BillingGateway,
   type CheckoutSessionResult,
-  type IndividualPlanId,
-  type OrganizationPlanId,
   type SubscriptionStatus,
 } from "@repo/core";
 
@@ -29,25 +25,24 @@ const checkoutReturnUrl =
 /**
  * Concrete Stripe adapter for the `BillingGateway` contract defined in
  * `packages/core`. No file outside this one may import the `stripe` package —
- * see AGENTS.md's billing section.
+ * see AGENTS.md's billing section. Has zero dependency on the plan catalog
+ * (subscription-plans module) — `billing.service.ts` resolves a plan to a real
+ * `providerPriceId` before ever calling in here, which is also what keeps this file
+ * and the subscription-plans module from circularly depending on each other.
  */
 export class StripeBillingService implements BillingGateway {
   async createCheckoutSession(
     orgId: string,
-    planId: OrganizationPlanId,
+    planId: string,
+    providerPriceId: string,
     quantity: number,
     idempotencyKey?: string,
   ): Promise<CheckoutSessionResult> {
-    const plan = organizationPlans[planId];
-    if (!plan.providerPriceId) {
-      throw new AppError("VALIDATION_ERROR", `Plan "${planId}" has no billable price configured`);
-    }
-
     const session = await getStripeClient().checkout.sessions.create(
       {
         mode: "subscription",
         client_reference_id: orgId,
-        line_items: [{ price: plan.providerPriceId, quantity }],
+        line_items: [{ price: providerPriceId, quantity }],
         success_url: `${checkoutReturnUrl}?checkout=success`,
         cancel_url: `${checkoutReturnUrl}?checkout=cancelled`,
         metadata: { ownerType: "organization", ownerId: orgId, planId },
@@ -64,19 +59,15 @@ export class StripeBillingService implements BillingGateway {
 
   async createIndividualCheckoutSession(
     userId: string,
-    planId: IndividualPlanId,
+    planId: string,
+    providerPriceId: string,
     idempotencyKey?: string,
   ): Promise<CheckoutSessionResult> {
-    const plan = individualPlans[planId];
-    if (!plan.providerPriceId) {
-      throw new AppError("VALIDATION_ERROR", `Plan "${planId}" has no billable price configured`);
-    }
-
     const session = await getStripeClient().checkout.sessions.create(
       {
         mode: "subscription",
         client_reference_id: userId,
-        line_items: [{ price: plan.providerPriceId, quantity: 1 }],
+        line_items: [{ price: providerPriceId, quantity: 1 }],
         success_url: `${checkoutReturnUrl}?checkout=success`,
         cancel_url: `${checkoutReturnUrl}?checkout=cancelled`,
         metadata: { ownerType: "individual", ownerId: userId, planId },
@@ -144,12 +135,13 @@ export class StripeBillingService implements BillingGateway {
           ownerId,
           providerCustomerId: session.customer,
           providerSubscriptionId: session.subscription,
+          planId,
         };
         if (ownerType === "organization") {
-          return { ...shared, ownerType, planId: planId as OrganizationPlanId };
+          return { ...shared, ownerType };
         }
         if (ownerType === "individual") {
-          return { ...shared, ownerType, planId: planId as IndividualPlanId };
+          return { ...shared, ownerType };
         }
         return null;
       }
@@ -169,6 +161,16 @@ export class StripeBillingService implements BillingGateway {
       default:
         return null;
     }
+  }
+
+  async validatePriceId(priceId: string): Promise<{ active: boolean; recurring: boolean }> {
+    let price: Stripe.Price;
+    try {
+      price = await getStripeClient().prices.retrieve(priceId);
+    } catch {
+      throw new AppError("VALIDATION_ERROR", `Stripe price "${priceId}" was not found`);
+    }
+    return { active: price.active, recurring: price.recurring !== null };
   }
 }
 

@@ -4,8 +4,15 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db, withOrgScope, ensureOrganizationProfileRow } from "@repo/db";
 import * as schema from "@repo/db/schema";
 import { accessControl, roles } from "./permissions";
+import { platformAccessControl, platformRoles } from "./platform-permissions";
 
 export { statement, roles } from "./permissions";
+export { platformStatement, platformRoles, platformAccessControl } from "./platform-permissions";
+// Re-exported for the same reason @repo/db re-exports drizzle-orm operators (see
+// AGENTS.md) — `better-auth` isn't a direct dependency of apps/api, only of this
+// package, so a consumer there importing `better-auth/api` directly could resolve a
+// different pnpm-isolated instance with incompatible types. Go through here instead.
+export { isAPIError } from "better-auth/api";
 
 /**
  * Comma-separated platform-operator user ids (`ADMIN_USER_IDS`), e.g. "usr_123,usr_456".
@@ -51,10 +58,11 @@ export const auth = betterAuth({
     // separate concept from the organization plugin's roles above, not a conflicting one:
     // this reads/writes `user.role` (one flag on the account itself), the organization
     // plugin reads/writes `member.role` (per-org-membership). Same role *name* ("admin")
-    // can exist in both without collision since they're different columns entirely. Uses
-    // the plugin's own default roles/permission statements (list/ban/impersonate users,
-    // manage sessions) rather than a custom `roles`/`ac` — nothing in this app needs
-    // finer-grained platform-admin tiers yet. See AGENTS.md's Platform admin section.
-    admin({ adminUserIds }),
+    // can exist in both without collision since they're different columns entirely.
+    // `roles`/`ac` are custom (platform-permissions.ts) — two tiers, `admin` (full access,
+    // matches Better Auth's own built-in default admin role exactly, verified against its
+    // source, so no existing admin silently loses capabilities) and `support`
+    // (list/get only). See AGENTS.md's Platform admin section.
+    admin({ adminUserIds, roles: platformRoles, ac: platformAccessControl }),
   ],
 });

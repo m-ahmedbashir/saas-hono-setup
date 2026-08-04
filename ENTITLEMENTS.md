@@ -38,29 +38,44 @@ individual billing after the fact.
 
 ### Domain layer — `packages/core/src/billing/entitlements.ts`
 
-- `FeatureKey` — boolean feature flags (illustrative set for this foundation, same as
-  `organizationPlans`/`individualPlans` themselves — a real product replaces these).
-- `PlanLimitKey` — numeric caps (e.g. `maxProjects`).
+**Superseded design note (as of the admin-editable plan catalog, see
+`specs/subscription-management-plan.md`):** the two paragraphs below describing
+`organizationPlanEntitlements`/`individualPlanEntitlements` and `BillingOwner` describe
+the _original_ design and no longer match the code — kept here for history, corrected
+inline. Plans (including their entitlements) are now rows in `packages/db`'s
+`subscriptionPlans` table, admin-editable from `apps/admin`, not a hardcoded map keyed
+by a closed `OrganizationPlanId`/`IndividualPlanId` union (those two types are now
+`string` aliases — see the spec's "Preserving the typed guarantee at runtime" section
+for what replaced the compile-time exhaustiveness guarantee this section originally
+described).
+
+- `FeatureKey` — boolean feature flags (illustrative set for this foundation). **This
+  one part is unchanged and must never move to the database** — it's the closed
+  vocabulary that makes "admin-editable plans, still typed" possible at all.
+- `PlanLimitKey` — numeric caps (e.g. `maxProjects`). Also unchanged, same reasoning.
+- `featureKeys` / `limitKeys` — runtime companions to the two type unions above,
+  derived from a `Record<FeatureKey, true>`/`Record<PlanLimitKey, true>` registry so an
+  omitted key is a `tsc` error, not a silent gap. What `subscription-plans.schema.ts`'s
+  `z.enum(featureKeys)`/`z.enum(limitKeys)` validate plan writes against, and what the
+  admin UI's plan form iterates over to render one toggle/number-field per known key.
 - `PlanEntitlements` — `{ features: Record<FeatureKey, boolean>; limits:
-Record<PlanLimitKey, number> }`.
-- `organizationPlanEntitlements: Record<OrganizationPlanId, PlanEntitlements>` and
-  `individualPlanEntitlements: Record<IndividualPlanId, PlanEntitlements>` — **two
-  separate maps, not a field added to `OrganizationPlanConfig`/`IndividualPlanConfig`.**
-  Those configs describe what Stripe needs to know about a plan (a billing/vendor
-  concern — SRP says that's one reason to change); entitlements describe what the app's
-  own authorization layer allows (a different concern, a different reason to change).
-  Keyed by the same `OrganizationPlanId`/`IndividualPlanId` types the billing configs
-  already use, so `Record`'s exhaustiveness makes a missing entry for a new plan id a
-  **compile error**, not a silent gap — the two maps can't drift out of sync with the
-  plan id unions without `tsc` catching it.
-- `BillingOwner` — `{ ownerType: "organization"; planId: OrganizationPlanId } |
-{ ownerType: "individual"; planId: IndividualPlanId }`. The one thing that generalizes
-  "which plan is this" across both universes, mirroring `BillingEvent`'s `ownerType`
-  discriminant in `billing/types.ts` on purpose — same reasoning, same pattern, one
-  fewer concept for a reader to learn.
-- `canAccessFeature(owner, feature)` / `getPlanLimit(owner, limit)` — pure functions, no
-  DB/HTTP. Resolving `owner.planId` from a real billing row is `apps/api`'s job (Domain
-  stays environment-agnostic per `AGENTS.md`'s DDD layering rule).
+Record<PlanLimitKey, number> }`. Unchanged shape.
+- `resolvePlanEntitlements(raw)` — pure normalizer, **replaces**
+  `organizationPlanEntitlements`/`individualPlanEntitlements`. Re-validates a plan row's
+  raw JSONB `features`/`limits` against `featureKeys`/`limitKeys` on every read (not
+  just at the write boundary): unknown keys dropped, missing known keys default to
+  `false`/`0`. This is what keeps `PlanEntitlements` exactly as closed as it was when it
+  came from a compiled map — only the _source_ of the raw data changed.
+- `fallbackEntitlements` — one small deny-most constant, used only when a plan row
+  genuinely doesn't exist at all (a seed/data gap) — never for a merely-deactivated plan
+  (which still resolves its real entitlements) and never for a DB error (which must
+  propagate, not fall back — see the spec's item 3).
+- `canAccessFeature(entitlements, feature)` / `getPlanLimit(entitlements, limit)` — pure
+  functions, no DB/HTTP, **now take an already-resolved `PlanEntitlements` directly**
+  instead of a `BillingOwner`. `BillingOwner` is gone — resolving a plan row (via
+  `apps/api`'s `subscription-plans.service.ts`, which knows how to look up a custom vs.
+  shared plan for an org) and normalizing it (`resolvePlanEntitlements`) both now happen
+  before these are ever called.
 
 ### Application layer — `apps/api/src/middleware/entitlement.middleware.ts`
 
@@ -113,9 +128,17 @@ make the client's error handling worse, not simpler.
 Both branches fetch the owner's billing row through the existing RLS-respecting
 helpers — `withOrgScope`/`getBillingByOrgId` and `withUserScope`/`getUserBillingByUserId`
 — never the bare `db` client, per `AGENTS.md`'s Row-Level Security rules. No billing row
-yet defaults to `"free"`/`"individual_free"`, the same defaulting `enforceSeatLimit`
-already uses for the organization side — a new signup with no billing row yet is not an
-error case, it's the free tier.
+yet resolves via `subscription-plans.service.ts`'s `getDefaultPlanId(ownerType)` — the
+current `isDefault: true` shared plan for that ownerType, **not** a hardcoded
+`"free"`/`"individual_free"` string anymore (that literal is now only a last-resort
+fallback inside `getDefaultPlanId` itself, for the data-integrity edge case where no
+plan is flagged default at all). A new signup with no billing row yet is not an error
+case, it's whatever plan an admin has configured as the default tier. The resolved
+`planId` string then goes through `resolveEntitlementsForPlan(ownerType, planId, organizationId)`
+(same file), which looks up the actual plan row — checking a custom org-scoped plan
+before falling back to the shared one, since a billing row's `plan` string alone can't
+disambiguate which — and normalizes it via `resolvePlanEntitlements` before
+`canAccessFeature`/`getPlanLimit` ever see it.
 
 ### Wiring a route
 

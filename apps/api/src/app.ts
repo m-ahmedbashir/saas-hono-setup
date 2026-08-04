@@ -10,6 +10,9 @@ import { billingRoutes } from "./modules/billing/billing.routes";
 import { profileRoutes } from "./modules/profile/profile.routes";
 import { organizationProfileRoutes } from "./modules/organization-profile/organization-profile.routes";
 import { organizationRoutes } from "./modules/organization/organization.routes";
+import { platformOrganizationsRoutes } from "./modules/platform-organizations/platform-organizations.routes";
+import { platformIndividualsRoutes } from "./modules/platform-individuals/platform-individuals.routes";
+import { subscriptionPlansRoutes } from "./modules/subscription-plans/subscription-plans.routes";
 import { accountRoutes } from "./modules/account/account.routes";
 import { createNotificationsRoutes } from "./modules/notifications/notifications.routes";
 import { allowedOrigins } from "./lib/allowed-origins";
@@ -49,6 +52,9 @@ export const app = new Hono()
   .route("/profile", profileRoutes)
   .route("/organization-profile", organizationProfileRoutes)
   .route("/organization", organizationRoutes)
+  .route("/platform-organizations", platformOrganizationsRoutes)
+  .route("/platform-individuals", platformIndividualsRoutes)
+  .route("/subscription-plans", subscriptionPlansRoutes)
   .route("/account", accountRoutes);
 
 export const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });

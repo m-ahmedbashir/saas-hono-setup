@@ -180,4 +180,22 @@ describe("requireFeature — individual scope", () => {
     });
     expect(res.status).toBe(200);
   });
+
+  // Proves the fail-loud/fallback split from specs/subscription-management-plan.md item
+  // 3 is real: a billing row referencing a planId with no matching subscription_plans
+  // row at all degrades to fallbackEntitlements (deny-most), not a 500 or a crash — this
+  // is the "seed gap" case, distinct from a deactivated plan (which still resolves its
+  // real entitlements normally) or a genuine DB error (which must propagate instead).
+  it("degrades to deny-most entitlements when the billing row's plan has no matching subscription_plans row at all", async () => {
+    await withUserScope(soloId, async (tx) => {
+      await updateUserBillingByUserId(tx, soloId, { plan: "no-such-plan-seed-gap" });
+    });
+
+    const res = await fetch(`http://localhost:${PORT}/test/individual-feature`, {
+      headers: { Cookie: soloCookie },
+    });
+    const body = (await res.json()) as { success: boolean; error?: { code: string } };
+    expect(res.status).toBe(402);
+    expect(body.error?.code).toBe("PAYMENT_REQUIRED");
+  });
 });

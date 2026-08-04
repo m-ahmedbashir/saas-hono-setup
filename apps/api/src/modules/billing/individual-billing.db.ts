@@ -1,4 +1,4 @@
-import { individualBilling, eq, type DbExecutor } from "@repo/db";
+import { individualBilling, eq, count, type DbExecutor } from "@repo/db";
 import type { IndividualPlanId, SubscriptionStatus } from "@repo/core";
 
 // Mirrors organization-billing.db.ts exactly, scoped by userId instead of
@@ -49,4 +49,13 @@ export async function updateUserBillingBySubscriptionId(
     .update(individualBilling)
     .set(values)
     .where(eq(individualBilling.providerSubscriptionId, providerSubscriptionId));
+}
+
+/** Mirrors organization-billing.db.ts's countByPlan exactly — see its comment. */
+export async function countByPlan(tx: DbExecutor, plan: string): Promise<number> {
+  const [row] = await tx
+    .select({ value: count() })
+    .from(individualBilling)
+    .where(eq(individualBilling.plan, plan));
+  return row?.value ?? 0;
 }
