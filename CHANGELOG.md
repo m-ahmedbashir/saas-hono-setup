@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.19.0] — 2026-08-04
+
+### Added
+
+- Admin-managed subscription plan catalog (`apps/api/src/modules/subscription-plans/`, `apps/admin`'s `/dashboard/subscription-plans`) — platform admins can now create/edit shared and custom (per-organization) plans, toggle known features, and set known limits without a deploy, replacing the previous hardcoded `organizationPlans`/`individualPlans` maps. Plan ids are now admin-editable strings, not a closed compile-time union; the closed vocabulary that matters (`FeatureKey`/`PlanLimitKey`) stays in code and is re-validated on every read, not just at the write boundary. Stripe Price IDs are verified live against Stripe before a plan is ever saved. No hard delete — `isActive: false` retires a plan without affecting existing subscribers. See `specs/subscription-management-plan.md` for the full design.
+
+### Changed
+
+- `BillingGateway.createCheckoutSession`/`createIndividualCheckoutSession` now take an already-resolved `providerPriceId` instead of looking up a plan internally — the vendor adapter (`stripe-billing.service.ts`) has zero dependency on the plan catalog now. New `billing.service.ts` resolves a plan and its price before calling the gateway.
+- `entitlement.middleware.ts`/`seat-limit.middleware.ts` resolve entitlements/seat limits from the database plan catalog instead of a hardcoded map, including the "no billing row yet" fallback (now the plan flagged `isDefault`, not a literal `"free"`/`"individual_free"` string).
+
+### Fixed
+
+- `apps/admin`'s "Users" platform-staff page renamed to "Staff" throughout (nav, route, page title, breadcrumb, and every internal identifier) — the old label was easily confused with the separate "Individuals" (real customers) page.
+- Platform Individuals list gained faceted filters (plan, billing status, "no organization association") matching the Staff table's existing role-facet pattern.
+
 ## [0.18.0] — 2026-07-25
 
 ### Added

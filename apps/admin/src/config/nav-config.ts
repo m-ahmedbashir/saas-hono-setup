@@ -72,6 +72,15 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         items: [],
       },
+
+      {
+        title: "Subscription Plans",
+        url: "/dashboard/subscription-plans",
+        icon: "billing",
+        shortcut: ["p", "p"],
+        isActive: false,
+        items: [],
+      },
     ],
   },
   {
