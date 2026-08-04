@@ -31,6 +31,12 @@ export const platformStatement = {
   // action for now (organization_profile.suspended) — no route enforces it yet, see
   // platform-organizations.service.ts.
   organization: ["list", "create", "ban"],
+  // Reused for the subscription-plan catalog (GET/POST/PATCH /subscription-plans) —
+  // `list` for read access (both tiers, same read-only-tier pattern as `user`/
+  // `organization` above), `manage` for create/edit (admin only). A genuinely new
+  // resource, not reused from `organization`/`user` above, since "can edit the plan
+  // catalog" is a distinct capability from "can list/ban organizations."
+  subscriptionPlans: ["list", "manage"],
 } as const;
 
 export const platformAccessControl = createAccessControl(platformStatement);
@@ -62,6 +68,7 @@ export const platformAdminRole = platformAccessControl.newRole({
   ],
   session: ["list", "revoke", "delete"],
   organization: ["list", "create", "ban"],
+  subscriptionPlans: ["list", "manage"],
 });
 
 /**
@@ -75,6 +82,7 @@ export const platformSupportRole = platformAccessControl.newRole({
   user: ["list", "get"],
   session: [],
   organization: ["list"],
+  subscriptionPlans: ["list"],
 });
 
 /**

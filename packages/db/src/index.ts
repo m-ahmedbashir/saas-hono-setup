@@ -45,6 +45,7 @@ export * from "./schema";
 export * from "./organization-profile";
 export {
   eq,
+  ne,
   and,
   or,
   count,

@@ -1,8 +1,10 @@
-import type { OrganizationPlanId, IndividualPlanId } from "./types";
-
 /**
- * Illustrative feature set for this foundation, same spirit as `organizationPlans`/
- * `individualPlans` in `./types.ts` — a real product replaces these with its own.
+ * Illustrative feature set for this foundation, same spirit as the plan catalog itself
+ * (see specs/subscription-management-plan.md) — a real product replaces these with its
+ * own. This is the one closed vocabulary that must never move to the database: admins
+ * can toggle these known keys on/off per plan, but adding a genuinely new capability
+ * still requires a code change, on purpose — the code cannot enforce a feature it has
+ * never heard of.
  */
 export type FeatureKey =
   "priority_support" | "advanced_analytics" | "api_access" | "custom_branding";
@@ -14,92 +16,74 @@ export interface PlanEntitlements {
   limits: Record<PlanLimitKey, number>;
 }
 
-/**
- * Deliberately separate maps from `organizationPlans`/`individualPlans`, not a field
- * added to `OrganizationPlanConfig`/`IndividualPlanConfig` — those describe what Stripe
- * needs to know about a plan (a billing/vendor concern); this describes what the app's
- * own authorization layer allows (a different concern, different reason to change).
- * Keyed by the same `OrganizationPlanId`/`IndividualPlanId` types those configs already
- * use — `Record`'s exhaustiveness makes a missing entry for a new plan id a compile
- * error here, not a silent gap.
- */
-export const organizationPlanEntitlements: Record<OrganizationPlanId, PlanEntitlements> = {
-  free: {
-    features: {
-      priority_support: false,
-      advanced_analytics: false,
-      api_access: false,
-      custom_branding: false,
-    },
-    limits: { maxProjects: 3, maxApiRequestsPerMonth: 1_000 },
-  },
-  starter: {
-    features: {
-      priority_support: false,
-      advanced_analytics: true,
-      api_access: true,
-      custom_branding: false,
-    },
-    limits: { maxProjects: 20, maxApiRequestsPerMonth: 50_000 },
-  },
-  growth: {
-    features: {
-      priority_support: true,
-      advanced_analytics: true,
-      api_access: true,
-      custom_branding: true,
-    },
-    limits: { maxProjects: 200, maxApiRequestsPerMonth: 500_000 },
-  },
+// Runtime companions to FeatureKey/PlanLimitKey — the types above are compile-time
+// only, with nothing to hand Zod (subscription-plans.schema.ts) or resolvePlanEntitlements
+// below at runtime. Derived from a Record so omitting a key here is a `tsc` error, not
+// a silent gap — same exhaustiveness guarantee `billing.schema.ts`'s `individualPlanIds`
+// gets from `Object.keys(individualPlans)`, just with no natural object of its own to
+// derive from here.
+const featureKeyRegistry: Record<FeatureKey, true> = {
+  priority_support: true,
+  advanced_analytics: true,
+  api_access: true,
+  custom_branding: true,
 };
+const limitKeyRegistry: Record<PlanLimitKey, true> = {
+  maxProjects: true,
+  maxApiRequestsPerMonth: true,
+};
+export const featureKeys = Object.keys(featureKeyRegistry) as [FeatureKey, ...FeatureKey[]];
+export const limitKeys = Object.keys(limitKeyRegistry) as [PlanLimitKey, ...PlanLimitKey[]];
 
-export const individualPlanEntitlements: Record<IndividualPlanId, PlanEntitlements> = {
-  individual_free: {
-    features: {
-      priority_support: false,
-      advanced_analytics: false,
-      api_access: false,
-      custom_branding: false,
-    },
-    limits: { maxProjects: 1, maxApiRequestsPerMonth: 100 },
+/**
+ * Deny-most fallback, used only when a plan row genuinely doesn't exist (e.g. a billing
+ * row referencing a `planId` with no matching `subscription_plans` row at all — a seed
+ * gap, not a deactivated plan, which still resolves its real entitlements normally, and
+ * not a DB error, which must propagate instead of silently downgrading a paying
+ * customer — see subscription-plans.service.ts's `resolveEntitlementsForPlan`).
+ */
+export const fallbackEntitlements: PlanEntitlements = {
+  features: {
+    priority_support: false,
+    advanced_analytics: false,
+    api_access: false,
+    custom_branding: false,
   },
-  individual_pro: {
-    features: {
-      priority_support: true,
-      advanced_analytics: true,
-      api_access: true,
-      custom_branding: false,
-    },
-    limits: { maxProjects: 10, maxApiRequestsPerMonth: 10_000 },
-  },
+  limits: { maxProjects: 0, maxApiRequestsPerMonth: 0 },
 };
 
 /**
- * The one thing that generalizes "which plan is this" across the two otherwise-separate
- * billing universes (see AGENTS.md's Billing model section) — every caller that needs to
- * check entitlements goes through this discriminated union instead of assuming
- * organization or individual. Mirrors `BillingEvent`'s `ownerType` discriminant on
- * purpose, same reasoning: organization and individual plan ids are different types, so
- * TypeScript narrows `planId` along with `ownerType`.
+ * Re-validates a plan row's raw JSONB against the closed FeatureKey/PlanLimitKey
+ * vocabularies on every read — not just at the POST/PATCH write boundary
+ * (subscription-plans.schema.ts). A FeatureKey renamed or removed in a later code
+ * change must not let a stale DB row referencing the old key keep resolving as if it
+ * were still valid: unknown keys are dropped, missing known keys default to
+ * `false`/`0`. Pure — no DB/HTTP, same as the functions below.
  */
-export type BillingOwner =
-  | { ownerType: "organization"; planId: OrganizationPlanId }
-  | { ownerType: "individual"; planId: IndividualPlanId };
-
-function resolveEntitlements(owner: BillingOwner): PlanEntitlements {
-  return owner.ownerType === "organization"
-    ? organizationPlanEntitlements[owner.planId]
-    : individualPlanEntitlements[owner.planId];
+export function resolvePlanEntitlements(raw: {
+  features: Record<string, boolean>;
+  limits: Record<string, number>;
+}): PlanEntitlements {
+  const features = {} as Record<FeatureKey, boolean>;
+  for (const key of featureKeys) {
+    features[key] = raw.features[key] ?? false;
+  }
+  const limits = {} as Record<PlanLimitKey, number>;
+  for (const key of limitKeys) {
+    limits[key] = raw.limits[key] ?? 0;
+  }
+  return { features, limits };
 }
 
 /**
- * Pure, environment-agnostic — no DB/HTTP. Resolving `owner.planId` from a real billing
- * row is the caller's job (see `requireFeature` in apps/api's entitlement.middleware.ts).
+ * Pure, environment-agnostic — no DB/HTTP. Resolving a `PlanEntitlements` from a real
+ * plan row is the caller's job (`subscription-plans.service.ts`'s
+ * `resolveEntitlementsForPlan`, called from `entitlement.middleware.ts`).
  */
-export function canAccessFeature(owner: BillingOwner, feature: FeatureKey): boolean {
-  return resolveEntitlements(owner).features[feature];
+export function canAccessFeature(entitlements: PlanEntitlements, feature: FeatureKey): boolean {
+  return entitlements.features[feature];
 }
 
-export function getPlanLimit(owner: BillingOwner, limit: PlanLimitKey): number {
-  return resolveEntitlements(owner).limits[limit];
+export function getPlanLimit(entitlements: PlanEntitlements, limit: PlanLimitKey): number {
+  return entitlements.limits[limit];
 }
