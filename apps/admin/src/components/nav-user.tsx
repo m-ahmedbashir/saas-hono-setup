@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Icons } from "@/components/icons";
+import { authClient, useSession } from "@/lib/auth-client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -19,16 +21,26 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-export function NavUser({
-  user,
-}: {
-  user: {
-    name: string;
-    email: string;
-    avatar: string;
-  };
-}) {
+function initials(name: string): string {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?"
+  );
+}
+
+export function NavUser() {
   const { isMobile } = useSidebar();
+  const router = useRouter();
+  const { data: session } = useSession();
+
+  const name = session?.user.name ?? "Account";
+  const email = session?.user.email ?? "";
+  const image = session?.user.image ?? undefined;
 
   return (
     <SidebarMenu>
@@ -43,12 +55,12 @@ export function NavUser({
             }
           >
             <Avatar className="h-8 w-8 rounded-lg">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+              <AvatarImage src={image} alt={name} />
+              <AvatarFallback className="rounded-lg">{initials(name)}</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">{user.name}</span>
-              <span className="truncate text-xs">{user.email}</span>
+              <span className="truncate font-semibold">{name}</span>
+              <span className="truncate text-xs">{email}</span>
             </div>
             <Icons.chevronsDown className="ml-auto size-4" />
           </DropdownMenuTrigger>
@@ -62,40 +74,35 @@ export function NavUser({
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                   <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                    <AvatarImage src={image} alt={name} />
+                    <AvatarFallback className="rounded-lg">{initials(name)}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{user.name}</span>
-                    <span className="truncate text-xs">{user.email}</span>
+                    <span className="truncate font-semibold">{name}</span>
+                    <span className="truncate text-xs">{email}</span>
                   </div>
                 </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Icons.sparkles className="mr-2 h-4 w-4" />
-                Upgrade to Pro
+              <DropdownMenuItem onClick={() => router.push("/dashboard/profile")}>
+                <Icons.user className="mr-2 h-4 w-4" />
+                Profile
               </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Icons.circleCheck className="mr-2 h-4 w-4" />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Icons.creditCard className="mr-2 h-4 w-4" />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/dashboard/notifications")}>
                 <Icons.notification className="mr-2 h-4 w-4" />
                 Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                authClient.signOut({
+                  fetchOptions: { onSuccess: () => router.push("/auth/sign-in") },
+                })
+              }
+            >
               <Icons.logout className="mr-2 h-4 w-4" />
               Log out
             </DropdownMenuItem>
