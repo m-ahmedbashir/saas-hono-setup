@@ -1,57 +1,11 @@
-export type OrganizationPlanId = "free" | "starter" | "growth";
-
-export interface OrganizationPlanConfig {
-  id: OrganizationPlanId;
-  name: string;
-  seatLimit: number;
-  /** Vendor-specific price identifier (e.g. a Stripe Price ID). `null` for a plan with no paid provider-side counterpart. */
-  providerPriceId: string | null;
-}
-
-/**
- * Example tier map for this foundation — a real product replaces these three
- * with its own tiers/limits. Kept here (not hand-scaffolded further) since
- * `BillingGateway` and the seat-limit middleware need *some* concrete OrganizationPlanId
- * to type-check against.
- */
-export const organizationPlans: Record<OrganizationPlanId, OrganizationPlanConfig> = {
-  free: { id: "free", name: "Free", seatLimit: 3, providerPriceId: null },
-  starter: {
-    id: "starter",
-    name: "Starter",
-    seatLimit: 10,
-    providerPriceId: process.env.STRIPE_PRICE_STARTER ?? null,
-  },
-  growth: {
-    id: "growth",
-    name: "Growth",
-    seatLimit: 50,
-    providerPriceId: process.env.STRIPE_PRICE_GROWTH ?? null,
-  },
-};
-
-/**
- * Individual (B2C) billing tiers — deliberately a separate map from `organizationPlans`, not a
- * variant of it. An individual isn't seat-based (no `seatLimit`/quantity concept),
- * so forcing it into `OrganizationPlanConfig`'s shape would mean a meaningless field on one side
- * or the other. See AGENTS.md's Billing model section for the organization-vs-individual split.
- */
-export type IndividualPlanId = "individual_free" | "individual_pro";
-
-export interface IndividualPlanConfig {
-  id: IndividualPlanId;
-  name: string;
-  providerPriceId: string | null;
-}
-
-export const individualPlans: Record<IndividualPlanId, IndividualPlanConfig> = {
-  individual_free: { id: "individual_free", name: "Individual Free", providerPriceId: null },
-  individual_pro: {
-    id: "individual_pro",
-    name: "Individual Pro",
-    providerPriceId: process.env.STRIPE_PRICE_INDIVIDUAL_PRO ?? null,
-  },
-};
+// Runtime strings, not closed unions — plan catalogs are admin-editable rows in
+// packages/db's `subscriptionPlans` table now (see specs/subscription-management-plan.md),
+// not a compile-time-enumerable set. The closed vocabulary that must never move to the
+// database is FeatureKey/PlanLimitKey (./entitlements.ts) — a plan *id* was always just
+// a lookup key, not a real enum of "the finite set of plans that can ever exist"; it
+// only looked like one while plans happened to be hardcoded.
+export type OrganizationPlanId = string;
+export type IndividualPlanId = string;
 
 /** Normalized across vendors — a `BillingGateway` implementation maps its own provider's statuses onto this set. */
 export type SubscriptionStatus = "active" | "past_due" | "canceled" | "incomplete";
@@ -67,10 +21,10 @@ export interface CheckoutSessionResult {
  * routes" goal for the one part of a billing integration where that's hardest.
  *
  * `checkout_completed` is a discriminated union on `ownerType` (not just `orgId`
- * widened to a generic id) because organization and individual checkouts resolve to
- * different plan maps (`OrganizationPlanId` vs `IndividualPlanId`) — the handler branches on
- * `ownerType` to decide which table (`organization_billing` vs `individual_billing`) to write to, and
- * TypeScript narrows `planId`'s type along with it.
+ * widened to a generic id) because organization and individual checkouts still write to
+ * different tables (`organization_billing` vs `individual_billing`) — the handler
+ * branches on `ownerType` to decide which one, even though `planId` itself is now the
+ * same `string` type on both branches.
  */
 export type BillingEvent =
   | {
@@ -105,6 +59,12 @@ export type BillingEvent =
  */
 export interface BillingGateway {
   /**
+   * `providerPriceId` is resolved by the caller (`billing.service.ts`, via the
+   * subscription-plans module) before this is ever called — the gateway itself has zero
+   * dependency on our plan catalog, only on a real Stripe Price id it's handed. `planId`
+   * is still passed through as opaque metadata, embedded in the session so the webhook
+   * handler later knows which plan a completed checkout was for.
+   *
    * `idempotencyKey`, when the caller supplies one (e.g. an `Idempotency-Key` request
    * header), is passed straight through to the vendor so a retried HTTP request to this
    * API returns the same checkout session instead of creating a second one. The vendor
@@ -115,6 +75,7 @@ export interface BillingGateway {
   createCheckoutSession(
     orgId: string,
     planId: OrganizationPlanId,
+    providerPriceId: string,
     quantity: number,
     idempotencyKey?: string,
   ): Promise<CheckoutSessionResult>;
@@ -122,10 +83,19 @@ export interface BillingGateway {
   createIndividualCheckoutSession(
     userId: string,
     planId: IndividualPlanId,
+    providerPriceId: string,
     idempotencyKey?: string,
   ): Promise<CheckoutSessionResult>;
   updateSubscriptionQuantity(subscriptionId: string, quantity: number): Promise<void>;
   cancelSubscription(subscriptionId: string): Promise<void>;
   /** Verifies the raw webhook payload's signature and returns a normalized event, or `null` for an event type this gateway doesn't map. Throws `AppError` on a bad signature. */
   parseWebhookEvent(payload: string, signature: string): BillingEvent | null;
+  /**
+   * Verifies an admin-entered Stripe Price id is real, active, and recurring — called
+   * from `subscription-plans.service.ts` on every create/update that sets a
+   * `providerPriceId`, so a typo'd or non-recurring price is caught at admin-save time
+   * instead of at a real customer's checkout attempt. Throws `AppError` if the id
+   * doesn't resolve to a Stripe Price at all.
+   */
+  validatePriceId(priceId: string): Promise<{ active: boolean; recurring: boolean }>;
 }

@@ -14,7 +14,7 @@ export default async function OrganizationListingPage() {
 
   const queryClient = getQueryClient();
 
-  // Same reasoning as features/users/components/user-listing.tsx — apps/api needs the
+  // Same reasoning as features/staff/components/staff-listing.tsx — apps/api needs the
   // session cookie forwarded explicitly for a server-side fetch; skip the prefetch
   // without one rather than issuing an unauthenticated request the gate would reject.
   const cookieStore = await cookies();

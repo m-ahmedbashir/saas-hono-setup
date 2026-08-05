@@ -1,14 +1,7 @@
 import { z } from "zod";
-import { individualPlans } from "@repo/core";
-
-const individualPlanIds = Object.keys(individualPlans) as [
-  keyof typeof individualPlans,
-  ...(keyof typeof individualPlans)[],
-];
 
 // No runtime const for this set in @repo/core (SubscriptionStatus is a type-only
-// union, unlike IndividualPlanId which individualPlans gives a real object to derive
-// keys from) — normalized across vendors per packages/core/src/billing/types.ts.
+// union) — normalized across vendors per packages/core/src/billing/types.ts.
 const subscriptionStatuses: [string, ...string[]] = [
   "active",
   "past_due",
@@ -29,11 +22,23 @@ function csvEnumArray<T extends [string, ...string[]]>(values: T) {
   );
 }
 
+// `plan` is a plain string array, not a closed enum — individual plan ids are
+// admin-editable rows in `subscription_plans` now (see
+// specs/subscription-management-plan.md), not a compile-time-enumerable set. Hardcoding
+// "individual_free"/"individual_pro" here would silently go stale the moment an admin
+// adds a third individual tier.
+function csvStringArray() {
+  return z.preprocess((val) => {
+    if (typeof val !== "string" || val.length === 0) return undefined;
+    return val.split(",");
+  }, z.array(z.string()).optional());
+}
+
 export const listPlatformIndividualsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   search: z.string().min(1).optional(),
-  plan: csvEnumArray(individualPlanIds),
+  plan: csvStringArray(),
   subscriptionStatus: csvEnumArray(subscriptionStatuses),
   hasOrganization: z
     .enum(["true", "false"])

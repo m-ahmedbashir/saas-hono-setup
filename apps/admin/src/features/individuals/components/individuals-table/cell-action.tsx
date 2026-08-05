@@ -21,7 +21,7 @@ interface CellActionProps {
   data: PlatformIndividual;
 }
 
-// Ban/Unban only, mirrors features/users/components/users-table/cell-action.tsx
+// Ban/Unban only, mirrors features/staff/components/staff-table/cell-action.tsx
 // exactly — same real, immediately-enforced authClient.admin.banUser/unbanUser call,
 // no reason input (matching that page's own choice not to collect one), no new
 // backend. Unlike organizations' Suspend action, there's no flag-only compromise here.

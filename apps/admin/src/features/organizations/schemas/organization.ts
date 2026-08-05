@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-// UX-only validation, same reasoning as features/users/schemas/user.ts — apps/api's
+// UX-only validation, same reasoning as features/staff/schemas/staff.ts — apps/api's
 // createPlatformOrganizationSchema remains the real authority; this just fails fast.
 export const createPlatformOrganizationSchema = z.object({
   organizationName: z.string().min(1, "Organization name is required"),

@@ -2,6 +2,38 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.21.0] — 2026-08-06
+
+### Added
+
+- Self-service account profile (`apps/admin`'s `/dashboard/profile`, `features/profile/`) — any signed-in user can now update their own display name and change their own password, using Better Auth's existing `updateUser`/`changePassword` client endpoints directly (both already scope to the caller's own session; no new `apps/api` endpoints were needed). Fixed the sidebar's bottom account menu (`components/nav-user.tsx`), which previously rendered a static "Account" label with a hardcoded "Sign in to manage your account" placeholder and no working logout — it now shows the real signed-in user's avatar/name/email and has working "Profile" and "Log out" actions. Removed the sidebar's separate template-leftover "Account" nav group (a redundant "Notifications" link plus a dead "Login" link) — notifications live in the header bell, and account actions live in the one account menu, not duplicated across three places.
+
+### Changed
+
+- Deleted `components/layout/user-nav.tsx`, a dead stub (`return null`) left over from the same template cleanup.
+
+## [0.20.0] — 2026-08-04
+
+### Added
+
+- Production-grade notification system (`apps/api/src/modules/notifications/`, `packages/db`'s `notification` table, `packages/core`'s `NotificationChannel`/`NotificationRecord` types). Persist-then-push durability: every notification is written to the database first (the source of truth), then pushed over the existing WebSocket dispatcher as a best-effort convenience — a delivery failure never loses the notification, since it's already durably stored and reachable via `GET /notifications` on the next real fetch. Channel delivery is behind a `NotificationChannel` interface so email/push/SMS can be added later as one new class + one array entry in `notifications.service.ts`, with zero changes to `notifyUser`/`notifyUsers` or any trigger call site. First real trigger wired in: a Stripe `subscription_updated`/`subscription_canceled` webhook landing on `past_due` or `canceled` now notifies every platform staff account, with a deep link to the affected organization's or individual's admin page — currently the only trigger with a reachable audience, since `apps/admin` has no customer-facing surface yet for an org member or individual to see their own notifications. `apps/admin`'s notification bell and `/dashboard/notifications` page now run on this real data (via a new `features/notifications/api` layer and a `useNotificationSocket()` hook) instead of the previous hardcoded mock Zustand store, which is now removed.
+
+## [0.19.0] — 2026-08-04
+
+### Added
+
+- Admin-managed subscription plan catalog (`apps/api/src/modules/subscription-plans/`, `apps/admin`'s `/dashboard/subscription-plans`) — platform admins can now create/edit shared and custom (per-organization) plans, toggle known features, and set known limits without a deploy, replacing the previous hardcoded `organizationPlans`/`individualPlans` maps. Plan ids are now admin-editable strings, not a closed compile-time union; the closed vocabulary that matters (`FeatureKey`/`PlanLimitKey`) stays in code and is re-validated on every read, not just at the write boundary. Stripe Price IDs are verified live against Stripe before a plan is ever saved. No hard delete — `isActive: false` retires a plan without affecting existing subscribers. See `specs/subscription-management-plan.md` for the full design.
+
+### Changed
+
+- `BillingGateway.createCheckoutSession`/`createIndividualCheckoutSession` now take an already-resolved `providerPriceId` instead of looking up a plan internally — the vendor adapter (`stripe-billing.service.ts`) has zero dependency on the plan catalog now. New `billing.service.ts` resolves a plan and its price before calling the gateway.
+- `entitlement.middleware.ts`/`seat-limit.middleware.ts` resolve entitlements/seat limits from the database plan catalog instead of a hardcoded map, including the "no billing row yet" fallback (now the plan flagged `isDefault`, not a literal `"free"`/`"individual_free"` string).
+
+### Fixed
+
+- `apps/admin`'s "Users" platform-staff page renamed to "Staff" throughout (nav, route, page title, breadcrumb, and every internal identifier) — the old label was easily confused with the separate "Individuals" (real customers) page.
+- Platform Individuals list gained faceted filters (plan, billing status, "no organization association") matching the Staff table's existing role-facet pattern.
+
 ## [0.18.0] — 2026-07-25
 
 ### Added

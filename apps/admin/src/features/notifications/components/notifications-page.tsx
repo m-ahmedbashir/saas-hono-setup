@@ -5,26 +5,39 @@ import PageContainer from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
 import { NotificationCard } from "@/components/ui/notification-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useNotificationStore } from "../utils/store";
+import { notificationsQueryOptions } from "../api/queries";
+import { markNotificationReadMutation, markAllNotificationsReadMutation } from "../api/mutations";
+import type { Notification } from "../api/types";
 
-const actionRoutes: Record<string, string> = {
-  view: "/dashboard/overview",
-  "view-product": "/dashboard/product",
-  billing: "/dashboard/overview",
-  open: "/dashboard/overview",
-  "open-chat": "/dashboard/overview",
-};
+const PAGE_LIMIT = 50;
 
 export default function NotificationsPage() {
-  const { notifications, markAsRead, markAllAsRead, unreadCount } = useNotificationStore();
   const router = useRouter();
-  const count = unreadCount();
+  const { data, isPending, isError, refetch } = useQuery(
+    notificationsQueryOptions({ limit: PAGE_LIMIT }),
+  );
+  const markRead = useMutation(markNotificationReadMutation);
+  const markAllRead = useMutation(markAllNotificationsReadMutation);
 
-  const unreadNotifications = notifications.filter((n) => n.status === "unread");
-  const readNotifications = notifications.filter((n) => n.status === "read");
+  const notifications = data?.notifications ?? [];
+  const unreadNotifications = notifications.filter((n) => !n.read);
+  const readNotifications = notifications.filter((n) => n.read);
 
-  const renderList = (items: typeof notifications) => {
+  const renderList = (items: Notification[]) => {
+    if (isError) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16">
+          <Icons.alertCircle className="text-destructive mb-3 h-10 w-10" />
+          <p className="text-muted-foreground text-sm">We could not load notifications.</p>
+          <Button onClick={() => refetch()} className="mt-4" size="sm">
+            Retry
+          </Button>
+        </div>
+      );
+    }
+
     if (items.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center py-16">
@@ -42,15 +55,25 @@ export default function NotificationsPage() {
             id={notification.id}
             title={notification.title}
             body={notification.body}
-            status={notification.status}
+            status={notification.read ? "read" : "unread"}
             createdAt={notification.createdAt}
-            actions={notification.actions}
-            onMarkAsRead={markAsRead}
-            onAction={(notifId, actionId) => {
-              const route = actionRoutes[actionId];
-              if (route) {
-                markAsRead(notifId);
-                router.push(route);
+            actions={
+              notification.actionUrl
+                ? [
+                    {
+                      id: "view",
+                      label: "View",
+                      type: "redirect" as const,
+                      style: "primary" as const,
+                    },
+                  ]
+                : []
+            }
+            onMarkAsRead={(id) => markRead.mutate(id)}
+            onAction={(id, actionId) => {
+              if (actionId === "view" && notification.actionUrl) {
+                markRead.mutate(id);
+                router.push(notification.actionUrl);
               }
             }}
           />
@@ -61,11 +84,12 @@ export default function NotificationsPage() {
 
   return (
     <PageContainer
+      isLoading={isPending}
       pageTitle="Notifications"
       pageDescription="View and manage all your notifications."
       pageHeaderAction={
-        count > 0 ? (
-          <Button variant="outline" size="sm" onClick={markAllAsRead}>
+        (data?.unreadCount ?? 0) > 0 ? (
+          <Button variant="outline" size="sm" onClick={() => markAllRead.mutate()}>
             Mark all as read
           </Button>
         ) : undefined

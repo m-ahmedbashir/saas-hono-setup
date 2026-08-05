@@ -1,6 +1,6 @@
-import { RecentSalesSkeleton } from "@/features/overview/components/recent-sales-skeleton";
+import { RecentSignupsSkeleton } from "@/features/overview/components/recent-signups-skeleton";
 import React from "react";
 
 export default function Loading() {
-  return <RecentSalesSkeleton />;
+  return <RecentSignupsSkeleton />;
 }

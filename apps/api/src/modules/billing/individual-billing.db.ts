@@ -1,4 +1,4 @@
-import { individualBilling, eq, type DbExecutor } from "@repo/db";
+import { individualBilling, eq, count, type DbExecutor } from "@repo/db";
 import type { IndividualPlanId, SubscriptionStatus } from "@repo/core";
 
 // Mirrors organization-billing.db.ts exactly, scoped by userId instead of
@@ -40,13 +40,25 @@ export async function updateUserBillingByUserId(
   await tx.update(individualBilling).set(values).where(eq(individualBilling.userId, userId));
 }
 
+/** Same reasoning as organization-billing.db.ts's identical change — returns the updated row (or `null`) so the caller can tell whether this table was the match. */
 export async function updateUserBillingBySubscriptionId(
   tx: DbExecutor,
   providerSubscriptionId: string,
   values: Partial<UserBillingUpdate>,
 ) {
-  await tx
+  const [updated] = await tx
     .update(individualBilling)
     .set(values)
-    .where(eq(individualBilling.providerSubscriptionId, providerSubscriptionId));
+    .where(eq(individualBilling.providerSubscriptionId, providerSubscriptionId))
+    .returning();
+  return updated ?? null;
+}
+
+/** Mirrors organization-billing.db.ts's countByPlan exactly — see its comment. */
+export async function countByPlan(tx: DbExecutor, plan: string): Promise<number> {
+  const [row] = await tx
+    .select({ value: count() })
+    .from(individualBilling)
+    .where(eq(individualBilling.plan, plan));
+  return row?.value ?? 0;
 }

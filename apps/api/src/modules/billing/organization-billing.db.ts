@@ -1,4 +1,4 @@
-import { organizationBilling, eq, type DbExecutor } from "@repo/db";
+import { organizationBilling, eq, count, type DbExecutor } from "@repo/db";
 import type { OrganizationPlanId, SubscriptionStatus } from "@repo/core";
 
 // Every function here requires an explicit `tx` — a `withOrgScope`/`withSystemScope`
@@ -46,13 +46,31 @@ export async function updateBillingByOrgId(
     .where(eq(organizationBilling.organizationId, organizationId));
 }
 
+/**
+ * Returns the updated row (or `null` if this subscription id doesn't belong to this
+ * table) instead of void — billing.handlers.ts's `subscription_updated`/
+ * `subscription_canceled` cases need to know *whether* this was the matching table (an
+ * org vs an individual) to resolve the right notification recipients; a bare `void`
+ * update can't tell them that.
+ */
 export async function updateBillingBySubscriptionId(
   tx: DbExecutor,
   providerSubscriptionId: string,
   values: Partial<BillingUpdate>,
 ) {
-  await tx
+  const [updated] = await tx
     .update(organizationBilling)
     .set(values)
-    .where(eq(organizationBilling.providerSubscriptionId, providerSubscriptionId));
+    .where(eq(organizationBilling.providerSubscriptionId, providerSubscriptionId))
+    .returning();
+  return updated ?? null;
+}
+
+/** Backs subscription-plans.service.ts's `activeSubscriberCount` — how many orgs currently have this plan string on their billing row, regardless of subscriptionStatus (matches "who would be affected by editing this plan," not just "who's actively paying"). */
+export async function countByPlan(tx: DbExecutor, plan: string): Promise<number> {
+  const [row] = await tx
+    .select({ value: count() })
+    .from(organizationBilling)
+    .where(eq(organizationBilling.plan, plan));
+  return row?.value ?? 0;
 }

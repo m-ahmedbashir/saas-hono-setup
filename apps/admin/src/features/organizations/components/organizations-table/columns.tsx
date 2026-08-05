@@ -62,7 +62,7 @@ export const columns: ColumnDef<PlatformOrganization>[] = [
     id: "owner",
     // No single accessorKey — combines name/email/verified/banned into one cell so an
     // admin sees everything about the owner at a glance, not spread across four
-    // columns. Verified/Unverified badge style matches features/users' columns.tsx.
+    // columns. Verified/Unverified badge style matches features/staff's columns.tsx.
     header: "Owner",
     cell: ({ row }) => {
       const org = row.original;

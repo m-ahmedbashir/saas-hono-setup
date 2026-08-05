@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "subscription_plans_shared_owner_plan_idx" ON "subscription_plans" USING btree ("owner_type","plan_id") WHERE "subscription_plans"."organization_id" IS NULL;

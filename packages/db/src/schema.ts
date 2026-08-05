@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -6,6 +6,7 @@ import {
   boolean,
   integer,
   date,
+  jsonb,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -282,6 +283,148 @@ export const individualBilling = pgTable(
 export const individualBillingRelations = relations(individualBilling, ({ one }) => ({
   user: one(user, {
     fields: [individualBilling.userId],
+    references: [user.id],
+  }),
+}));
+
+// Admin-editable plan catalog — replaces the two hardcoded organizationPlans/
+// individualPlans maps that used to live in packages/core/src/billing/types.ts. See
+// specs/subscription-management-plan.md. Global config, not owner-scoped app data —
+// deliberately NOT RLS-enabled (unlike organizationBilling/individualBilling above):
+// RLS in this repo scopes tables per-owner, and this table has no single owner to scope
+// to — every plan row is either shared (readable/usable by any org) or tied to one
+// `organizationId` for admin-management purposes only, not as an access-control scope.
+// Reads/writes are gated by requirePlatformPermission instead (apps/api's
+// subscription-plans module), the same mechanism platform-organizations/
+// platform-individuals already use for other platform-wide config.
+export const subscriptionPlans = pgTable(
+  "subscription_plans",
+  {
+    id: text("id").primaryKey(),
+    // "organization" | "individual" — matches @repo/core's BillingOwner discriminant.
+    // Free text, not a DB enum, same reasoning as organizationBilling.plan above
+    // (packages/db can't import from packages/core).
+    ownerType: text("owner_type").notNull(),
+    // Slug-like identifier, e.g. "starter" or "enterprise" — unique within its scope
+    // (see the index below), not globally. This is what organizationBilling.plan/
+    // individualBilling.plan store as a plain string.
+    planId: text("plan_id").notNull(),
+    // NULL = shared/public plan any org can subscribe to. Set = a custom/negotiated
+    // plan for that one organization only (an enterprise deal) — for admin bookkeeping
+    // only, not an RLS scope (see table-level comment above).
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+    name: text("name").notNull(),
+    description: text("description"),
+    // NULL for individual plans — no seat/quantity concept, same reasoning as
+    // individualBilling having no seatQuantity column.
+    seatLimit: integer("seat_limit"),
+    // NULL for free/handled-offline plans. Verified live against Stripe
+    // (BillingGateway.validatePriceId) before being saved here — see
+    // subscription-plans.service.ts.
+    providerPriceId: text("provider_price_id"),
+    // Keyed by @repo/core's closed FeatureKey/PlanLimitKey unions, re-validated on
+    // every read (packages/core/src/billing/entitlements.ts's resolvePlanEntitlements)
+    // — never trusted as pre-validated just because it came from this table. jsonb, not
+    // a normalized child table: the key vocabulary is closed and small (see
+    // entitlements.ts), so a join here would buy nothing a JSONB map doesn't already
+    // give for free.
+    features: jsonb("features").$type<Record<string, boolean>>().notNull().default({}),
+    limits: jsonb("limits").$type<Record<string, number>>().notNull().default({}),
+    // Disables a plan for new checkouts without deleting historical rows — this module
+    // has no hard delete at all (see specs/subscription-management-plan.md). A
+    // deactivated plan's existing subscribers are unaffected; only new checkouts stop
+    // offering it.
+    isActive: boolean("is_active").notNull().default(true),
+    // The plan a new signup with no billing row yet resolves to, per ownerType. Exactly
+    // one shared (organizationId IS NULL) plan per ownerType may have this set — see
+    // the partial unique index below, the actual enforcement, not just convention.
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    // Protects same-org duplicates: one organization can't create two custom plans
+    // with the identical planId (organizationId is a real, equal, non-null value on
+    // both rows, so a plain unique index does catch this).
+    uniqueIndex("subscription_plans_owner_plan_org_idx").on(
+      table.ownerType,
+      table.planId,
+      table.organizationId,
+    ),
+    // Protects shared-plan duplicates — genuinely a separate index, not something the
+    // one above also covers. Verified directly against real Postgres behavior, not
+    // assumed: standard SQL unique-index semantics treat NULL as distinct from every
+    // other NULL (including another NULL), so two shared plans (organizationId IS NULL
+    // on both) do NOT collide on the 3-column index above — confirmed by a failing
+    // integration test before this index was added, not caught by reasoning alone. A
+    // partial index scoped to `organizationId IS NULL` is the only way to get real
+    // uniqueness among shared plans; two different orgs' custom plans reusing the same
+    // slug (organizationId set, non-null, different per org) are correctly unaffected
+    // by this index since they never match its WHERE clause.
+    uniqueIndex("subscription_plans_shared_owner_plan_idx")
+      .on(table.ownerType, table.planId)
+      .where(sql`${table.organizationId} IS NULL`),
+    index("subscription_plans_owner_org_active_idx").on(
+      table.ownerType,
+      table.organizationId,
+      table.isActive,
+    ),
+    // The actual backstop for "exactly one default plan per ownerType" — a
+    // service-layer check-then-write alone can't close a concurrent-write race. See
+    // specs/subscription-management-plan.md's "Closing the payment-correctness gaps"
+    // item 2.
+    uniqueIndex("subscription_plans_one_default_per_owner_type_idx")
+      .on(table.ownerType)
+      .where(sql`${table.isDefault} = true AND ${table.organizationId} IS NULL`),
+  ],
+);
+
+export const subscriptionPlansRelations = relations(subscriptionPlans, ({ one }) => ({
+  organization: one(organization, {
+    fields: [subscriptionPlans.organizationId],
+    references: [organization.id],
+  }),
+}));
+
+// Persisted, per-user notification inbox — the durability half of the notification
+// system (see specs/notifications-plan.md). Real-time delivery (the WebSocket
+// dispatcher, apps/api/src/modules/notifications/channels/websocket-channel.ts) is a
+// best-effort convenience on top of this; this row is what guarantees a notification
+// is never lost just because its recipient wasn't online when it fired. FK'd to
+// `user.id` directly — works identically for an individual, an org member, or platform
+// staff, since Better Auth's `user` table already unifies all three (no per-audience
+// notification table needed).
+export const notification = pgTable(
+  "notification",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    // Where clicking the notification should take you — e.g. the organization/billing
+    // page the event concerns. Nullable: not every notification needs a destination.
+    actionUrl: text("action_url"),
+    read: boolean("read").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("notification_userId_idx").on(table.userId),
+    // Backs the unread-count/unread-list queries specifically — the vast majority of
+    // reads against this table are "my unread notifications," not "all of them".
+    index("notification_userId_read_idx").on(table.userId, table.read),
+  ],
+);
+
+export const notificationRelations = relations(notification, ({ one }) => ({
+  user: one(user, {
+    fields: [notification.userId],
     references: [user.id],
   }),
 }));

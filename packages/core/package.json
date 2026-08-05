@@ -1,6 +1,6 @@
 {
   "name": "@repo/core",
-  "version": "0.18.0",
+  "version": "0.21.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./auth": "./src/auth/index.ts",
-    "./auth/platform-permissions": "./src/auth/platform-permissions.ts"
+    "./auth/platform-permissions": "./src/auth/platform-permissions.ts",
+    "./billing/entitlements": "./src/billing/entitlements.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
