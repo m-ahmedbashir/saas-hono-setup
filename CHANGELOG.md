@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.21.0] — 2026-08-06
+
+### Added
+
+- Self-service account profile (`apps/admin`'s `/dashboard/profile`, `features/profile/`) — any signed-in user can now update their own display name and change their own password, using Better Auth's existing `updateUser`/`changePassword` client endpoints directly (both already scope to the caller's own session; no new `apps/api` endpoints were needed). Fixed the sidebar's bottom account menu (`components/nav-user.tsx`), which previously rendered a static "Account" label with a hardcoded "Sign in to manage your account" placeholder and no working logout — it now shows the real signed-in user's avatar/name/email and has working "Profile" and "Log out" actions. Removed the sidebar's separate template-leftover "Account" nav group (a redundant "Notifications" link plus a dead "Login" link) — notifications live in the header bell, and account actions live in the one account menu, not duplicated across three places.
+
+### Changed
+
+- Deleted `components/layout/user-nav.tsx`, a dead stub (`return null`) left over from the same template cleanup.
+
 ## [0.20.0] — 2026-08-04
 
 ### Added
