@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.20.0] — 2026-08-04
+
+### Added
+
+- Production-grade notification system (`apps/api/src/modules/notifications/`, `packages/db`'s `notification` table, `packages/core`'s `NotificationChannel`/`NotificationRecord` types). Persist-then-push durability: every notification is written to the database first (the source of truth), then pushed over the existing WebSocket dispatcher as a best-effort convenience — a delivery failure never loses the notification, since it's already durably stored and reachable via `GET /notifications` on the next real fetch. Channel delivery is behind a `NotificationChannel` interface so email/push/SMS can be added later as one new class + one array entry in `notifications.service.ts`, with zero changes to `notifyUser`/`notifyUsers` or any trigger call site. First real trigger wired in: a Stripe `subscription_updated`/`subscription_canceled` webhook landing on `past_due` or `canceled` now notifies every platform staff account, with a deep link to the affected organization's or individual's admin page — currently the only trigger with a reachable audience, since `apps/admin` has no customer-facing surface yet for an org member or individual to see their own notifications. `apps/admin`'s notification bell and `/dashboard/notifications` page now run on this real data (via a new `features/notifications/api` layer and a `useNotificationSocket()` hook) instead of the previous hardcoded mock Zustand store, which is now removed.
+
 ## [0.19.0] — 2026-08-04
 
 ### Added

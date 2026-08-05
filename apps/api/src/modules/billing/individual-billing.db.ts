@@ -40,15 +40,18 @@ export async function updateUserBillingByUserId(
   await tx.update(individualBilling).set(values).where(eq(individualBilling.userId, userId));
 }
 
+/** Same reasoning as organization-billing.db.ts's identical change — returns the updated row (or `null`) so the caller can tell whether this table was the match. */
 export async function updateUserBillingBySubscriptionId(
   tx: DbExecutor,
   providerSubscriptionId: string,
   values: Partial<UserBillingUpdate>,
 ) {
-  await tx
+  const [updated] = await tx
     .update(individualBilling)
     .set(values)
-    .where(eq(individualBilling.providerSubscriptionId, providerSubscriptionId));
+    .where(eq(individualBilling.providerSubscriptionId, providerSubscriptionId))
+    .returning();
+  return updated ?? null;
 }
 
 /** Mirrors organization-billing.db.ts's countByPlan exactly — see its comment. */
