@@ -256,9 +256,12 @@ describe("Payment-failed trigger (billing webhook -> platform staff notification
     // state rather than inserting a billing row by hand.
     const subscriptionId = `sub_test_notif_fake_${Date.now()}`;
     const checkoutPayload = JSON.stringify({
-      id: "evt_test_notif_checkout_completed",
+      // Unique per run — see billing.integration.test.ts's identical comment on why a
+      // hardcoded event id would collide with the immutable billing_events ledger.
+      id: `evt_test_notif_checkout_completed_${Date.now()}`,
       object: "event",
       type: "checkout.session.completed",
+      created: Math.floor(Date.now() / 1000),
       data: {
         object: {
           id: "cs_test_notif_fake",
@@ -280,9 +283,12 @@ describe("Payment-failed trigger (billing webhook -> platform staff notification
     });
 
     const updatedPayload = JSON.stringify({
-      id: "evt_test_notif_subscription_updated",
+      // Unique per run — see billing.integration.test.ts's identical comment on why a
+      // hardcoded event id would collide with the immutable billing_events ledger.
+      id: `evt_test_notif_subscription_updated_${Date.now()}`,
       object: "event",
       type: "customer.subscription.updated",
+      created: Math.floor(Date.now() / 1000),
       data: {
         object: {
           id: subscriptionId,
@@ -302,11 +308,19 @@ describe("Payment-failed trigger (billing webhook -> platform staff notification
     });
     expect(res.status).toBe(200);
 
+    // getPlatformStaffUserIds() fans out to every platform staff account that exists at
+    // the moment it runs, by design — a different, concurrently-running test file's own
+    // past_due trigger legitimately notifies this same staff account too (each test
+    // creates its own admin account, but they're all real platform staff sharing the
+    // same dev database). So this asserts the *specific* notification for this test's
+    // own org exists, not that it's the only notification this staff account ever
+    // received during the whole suite's run.
     const staffNotifications = await withUserScope(staffUserId, (tx) =>
       tx.select().from(notificationTable).where(eq(notificationTable.userId, staffUserId)),
     );
-    expect(staffNotifications).toHaveLength(1);
-    expect(staffNotifications[0]?.title).toContain("Payment failed");
-    expect(staffNotifications[0]?.actionUrl).toBe(`/dashboard/organizations/${orgId}`);
+    const forThisOrg = staffNotifications.find(
+      (n) => n.actionUrl === `/dashboard/organizations/${orgId}`,
+    );
+    expect(forThisOrg?.title).toContain("Payment failed");
   });
 });

@@ -191,9 +191,15 @@ describe("POST /billing/webhook", () => {
     // (e.g. the process got killed mid-suite), failing this test for an unrelated reason.
     const subscriptionId = `sub_test_fake_${Date.now()}`;
     const payload = JSON.stringify({
-      id: "evt_test_checkout_completed",
+      // Now that billing_events remembers every stripeEventId it's ever seen (the
+      // idempotency ledger — see specs/billing-integrity-plan.md), a hardcoded literal
+      // here would only pass on the very first run ever; any later run treats it as an
+      // already-processed duplicate and correctly skips the real logic, which looks
+      // exactly like this test failing for an unrelated reason.
+      id: `evt_test_checkout_completed_${Date.now()}`,
       object: "event",
       type: "checkout.session.completed",
+      created: Math.floor(Date.now() / 1000),
       data: {
         object: {
           id: "cs_test_fake",

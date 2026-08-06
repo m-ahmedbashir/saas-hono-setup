@@ -1,4 +1,4 @@
-import { organizationBilling, eq, count, type DbExecutor } from "@repo/db";
+import { organizationBilling, eq, and, or, isNull, lt, count, type DbExecutor } from "@repo/db";
 import type { OrganizationPlanId, SubscriptionStatus } from "@repo/core";
 
 // Every function here requires an explicit `tx` — a `withOrgScope`/`withSystemScope`
@@ -12,6 +12,20 @@ export async function getBillingByOrgId(tx: DbExecutor, organizationId: string) 
     .select()
     .from(organizationBilling)
     .where(eq(organizationBilling.organizationId, organizationId));
+  return row ?? null;
+}
+
+/**
+ * Read-only lookup by subscription id — unlike `updateBillingBySubscriptionId`, never
+ * mutates anything, so it's safe to call purely to resolve which owner a subscription id
+ * belongs to (e.g. `invoice.paid`'s handler needs this to build an `invoices` row,
+ * without necessarily changing this table's own state at all).
+ */
+export async function getBillingBySubscriptionId(tx: DbExecutor, providerSubscriptionId: string) {
+  const [row] = await tx
+    .select()
+    .from(organizationBilling)
+    .where(eq(organizationBilling.providerSubscriptionId, providerSubscriptionId));
   return row ?? null;
 }
 
@@ -48,20 +62,37 @@ export async function updateBillingByOrgId(
 
 /**
  * Returns the updated row (or `null` if this subscription id doesn't belong to this
- * table) instead of void — billing.handlers.ts's `subscription_updated`/
- * `subscription_canceled` cases need to know *whether* this was the matching table (an
- * org vs an individual) to resolve the right notification recipients; a bare `void`
- * update can't tell them that.
+ * table, OR if `eventCreatedAt` is older than the last event already applied) instead of
+ * void — billing.handlers.ts's `subscription_updated`/`subscription_canceled` cases need
+ * to know *whether* this was the matching table (an org vs an individual) to resolve the
+ * right notification recipients; a bare `void` update can't tell them that.
+ *
+ * `eventCreatedAt` guards against out-of-order webhook delivery (see
+ * specs/billing-integrity-plan.md's Fix 3): Stripe delivers at-least-once but not in
+ * order, so a delayed retry of an older event could otherwise overwrite a row a newer
+ * event already corrected. `lastEventAt IS NULL` (no lifecycle event applied yet) or
+ * strictly older than the incoming event's own timestamp is required for the write to
+ * take effect at all; an out-of-order event matches zero rows here — a real no-op, not a
+ * mistaken overwrite.
  */
 export async function updateBillingBySubscriptionId(
   tx: DbExecutor,
   providerSubscriptionId: string,
+  eventCreatedAt: Date,
   values: Partial<BillingUpdate>,
 ) {
   const [updated] = await tx
     .update(organizationBilling)
-    .set(values)
-    .where(eq(organizationBilling.providerSubscriptionId, providerSubscriptionId))
+    .set({ ...values, lastEventAt: eventCreatedAt })
+    .where(
+      and(
+        eq(organizationBilling.providerSubscriptionId, providerSubscriptionId),
+        or(
+          isNull(organizationBilling.lastEventAt),
+          lt(organizationBilling.lastEventAt, eventCreatedAt),
+        ),
+      ),
+    )
     .returning();
   return updated ?? null;
 }

@@ -95,18 +95,36 @@ jobs:
           BILLING_CHECKOUT_RETURN_URL=http://localhost:3000/billing
           EOF
 
-      - name: Run migrations
-        run: pnpm db:migrate
-
       - name: Create restricted app_user role
-        # The default `postgres` role in this ephemeral container is a superuser, which
-        # bypasses Row-Level Security same as Neon's owner role does in dev — without
-        # this step, the RLS-proof test would pass in CI for the wrong reason (still
-        # bypassing, just a different bypass). See AGENTS.md's Row-Level Security section.
+        # Runs before migrations, not after: create-app-role.js's ALTER DEFAULT
+        # PRIVILEGES rule covers tables created afterward by the same connecting role,
+        # so the role doesn't need any tables to exist first. It must exist before
+        # migrations run because some migrations (e.g. 0019_billing_events_immutability)
+        # reference `app_user` directly (REVOKE ... FROM app_user), not just via RLS
+        # policies' current_setting(...) checks — those would fail with "role app_user
+        # does not exist" on a fresh database otherwise. The default `postgres` role in
+        # this ephemeral container is a superuser, which bypasses Row-Level Security same
+        # as Neon's owner role does in dev — without this step, the RLS-proof test would
+        # pass in CI for the wrong reason (still bypassing, just a different bypass). See
+        # AGENTS.md's Row-Level Security section.
         run: APP_ROLE_PASSWORD=ci-app-user-password-not-a-real-secret pnpm --filter @repo/db create-app-role
 
       - name: Add APP_DATABASE_URL to test environment file
         run: echo "APP_DATABASE_URL=postgresql://app_user:ci-app-user-password-not-a-real-secret@localhost:5432/test" >> .env.development
+
+      - name: Run migrations
+        run: pnpm db:migrate
+
+      - name: Seed subscription plans
+        # 0017_seed_default_subscription_plans.sql only seeds the two free-tier default
+        # plans (needed so entitlement/seat-limit checks have a fallback on a brand-new
+        # billing row) — the paid tiers (`growth`, `individual_pro`, `starter`) this
+        # script adds have only ever existed in local dev DBs via a manual one-off run,
+        # never in CI's ephemeral database. entitlement.integration.test.ts's "upgrade to
+        # a plan with the feature" cases need those paid-tier rows to exist or they always
+        # fall through to fallbackEntitlements (deny-most) and return 402 regardless of
+        # which plan the billing row is set to.
+        run: pnpm --filter @repo/api seed:subscription-plans
 
       - name: Run tests
         run: pnpm test

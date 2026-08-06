@@ -127,6 +127,20 @@
       "when": 1785971283087,
       "tag": "0017_seed_default_subscription_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785974954581,
+      "tag": "0018_amused_calypso",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785974968185,
+      "tag": "0019_billing_events_immutability",
+      "breakpoints": true
     }
   ]
 }

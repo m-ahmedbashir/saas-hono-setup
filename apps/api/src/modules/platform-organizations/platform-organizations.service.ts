@@ -11,6 +11,7 @@ import {
   getOrganizationDetail,
   getOrganizationMembers,
 } from "./platform-organizations.db";
+import { listInvoicesByOrganizationId } from "../billing/invoices.db";
 import type { CreatePlatformOrganizationBody } from "./platform-organizations.schema";
 
 export interface PlatformOrganizationSummary {
@@ -192,6 +193,16 @@ export interface PlatformOrganizationMember {
   joinedAt: Date;
 }
 
+export interface PlatformOrganizationInvoice {
+  id: string;
+  planId: string;
+  amountTotal: number;
+  currency: string;
+  status: string;
+  receiptUrl: string | null;
+  issuedAt: Date;
+}
+
 export interface PlatformOrganizationDetail {
   id: string;
   name: string;
@@ -218,6 +229,7 @@ export interface PlatformOrganizationDetail {
   addressPostalCode: string | null;
   addressCountry: string | null;
   members: PlatformOrganizationMember[];
+  invoices: PlatformOrganizationInvoice[];
 }
 
 // Same withSystemScope reasoning as listPlatformOrganizations — a platform-admin read
@@ -230,7 +242,19 @@ export async function getPlatformOrganizationDetail(
     if (!detail) {
       throw new AppError("NOT_FOUND", "Organization not found");
     }
-    const members = await getOrganizationMembers(tx, organizationId);
-    return { ...detail, members };
+    const [members, invoiceRows] = await Promise.all([
+      getOrganizationMembers(tx, organizationId),
+      listInvoicesByOrganizationId(tx, organizationId),
+    ]);
+    const invoices: PlatformOrganizationInvoice[] = invoiceRows.map((row) => ({
+      id: row.id,
+      planId: row.planId,
+      amountTotal: row.amountTotal,
+      currency: row.currency,
+      status: row.status,
+      receiptUrl: row.receiptUrl,
+      issuedAt: row.issuedAt,
+    }));
+    return { ...detail, members, invoices };
   });
 }
