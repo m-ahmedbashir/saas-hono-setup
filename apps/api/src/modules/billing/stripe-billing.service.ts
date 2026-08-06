@@ -115,6 +115,17 @@ export class StripeBillingService implements BillingGateway {
       throw new AppError("VALIDATION_ERROR", "Invalid Stripe webhook signature");
     }
 
+    // Common to every mapped variant — see BillingEventEnvelope's doc comment
+    // (packages/core/src/billing/types.ts) for why this is factored out instead of
+    // repeated per case below. `event.data.object` is already a plain JS object by this
+    // point (Stripe's SDK has finished parsing/verifying it), so casting to
+    // `Record<string, unknown>` for the ledger's jsonb column is safe, not a type escape.
+    const envelope = {
+      stripeEventId: event.id,
+      eventCreatedAt: new Date(event.created * 1000),
+      rawPayload: event.data.object as unknown as Record<string, unknown>,
+    };
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -131,6 +142,7 @@ export class StripeBillingService implements BillingGateway {
         }
 
         const shared = {
+          ...envelope,
           type: "checkout_completed" as const,
           ownerId,
           providerCustomerId: session.customer,
@@ -148,6 +160,7 @@ export class StripeBillingService implements BillingGateway {
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
         return {
+          ...envelope,
           type: "subscription_updated",
           providerSubscriptionId: subscription.id,
           status: mapStripeStatus(subscription.status),
@@ -156,7 +169,52 @@ export class StripeBillingService implements BillingGateway {
       }
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        return { type: "subscription_canceled", providerSubscriptionId: subscription.id };
+        return {
+          ...envelope,
+          type: "subscription_canceled",
+          providerSubscriptionId: subscription.id,
+        };
+      }
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const providerSubscriptionId = toId(invoice.parent?.subscription_details?.subscription);
+        if (!providerSubscriptionId) return null;
+
+        return {
+          ...envelope,
+          type: "invoice_paid",
+          providerSubscriptionId,
+          stripeInvoiceId: invoice.id!,
+          // Best-effort: only present if the invoice's `payments` sub-list happens to be
+          // included on the webhook payload — see BillingEvent's doc comment on this
+          // field for the full caveat. Not fetched via an extra API call in this pass.
+          paymentIntentId: toId(invoice.payments?.data[0]?.payment.payment_intent) ?? null,
+          amountTotal: invoice.amount_paid,
+          currency: invoice.currency,
+          receiptUrl: invoice.hosted_invoice_url ?? null,
+        };
+      }
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const providerSubscriptionId = toId(invoice.parent?.subscription_details?.subscription);
+        if (!providerSubscriptionId) return null;
+
+        return { ...envelope, type: "invoice_payment_failed", providerSubscriptionId };
+      }
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        const paymentIntentId = toId(charge.payment_intent);
+        if (!paymentIntentId) return null;
+
+        return { ...envelope, type: "charge_refunded", paymentIntentId };
+      }
+      case "charge.dispute.created": {
+        const dispute = event.data.object as Stripe.Dispute;
+        return {
+          ...envelope,
+          type: "charge_dispute_created",
+          paymentIntentId: toId(dispute.payment_intent),
+        };
       }
       default:
         return null;
@@ -172,6 +230,18 @@ export class StripeBillingService implements BillingGateway {
     }
     return { active: price.active, recurring: price.recurring !== null };
   }
+}
+
+/**
+ * Normalizes one of Stripe's many `string | ExpandableObject | null | undefined`
+ * reference fields (customer, subscription, payment_intent, ...) down to a plain id —
+ * present as a bare string on an unexpanded webhook payload, or an object with its own
+ * `id` if the caller happened to expand it. Returns `null` for anything else (missing,
+ * or a `DeletedX` stub with no live `id` to trust).
+ */
+function toId(value: string | { id: string } | null | undefined): string | null {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.id;
 }
 
 function mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionStatus {

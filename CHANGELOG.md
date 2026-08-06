@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.22.0] — 2026-08-06
+
+### Added
+
+- Billing integrity: an append-only `billing_events` ledger, a curated `invoices` table, and two webhook-ordering correctness fixes — see `specs/billing-integrity-plan.md` for the full design. Previously, `organization_billing`/`individual_billing` were pure current-state snapshots with no history, no inbound webhook idempotency, and no record of an actual completed transaction.
+  - `billing_events` records every Stripe webhook event this app receives, verbatim, keyed on Stripe's own event id — a duplicate delivery (Stripe's webhooks are at-least-once, not exactly-once) now inserts nothing and is skipped rather than reprocessed, closing a real gap where a retried `past_due` delivery would have re-fired a duplicate staff notification. Immutable at the Postgres grant level (`REVOKE UPDATE, DELETE ... FROM app_user`), not just by convention.
+  - `invoices` is a curated, one-row-per-transaction receipt record (plan, amount, currency, Stripe's hosted invoice URL) derived from `invoice.paid`/`charge.refunded` — the future home of a "billing history" view, distinct from the raw event ledger.
+  - Expanded webhook event coverage: `invoice.paid`, `invoice.payment_failed`, `charge.refunded`, and `charge.dispute.created` are now mapped and recorded — previously silently dropped, including refunds and chargebacks, which were completely invisible to this system.
+  - Out-of-order delivery guard: Stripe delivers webhooks at-least-once but not in order. `organization_billing`/`individual_billing` gained a `lastEventAt` column, and every lifecycle update is now conditional on the incoming event's own timestamp — a delayed retry of an older event can no longer overwrite a row a newer event already corrected.
+  - Refund-before-invoice race guard: a `charge.refunded` arriving before its `invoice.paid` (a real possible ordering, not swallowed) now fails loudly and rolls back rather than silently dropping the refund, relying on Stripe's own retry schedule to redeliver once the invoice exists.
+  - Documented (not yet wired up, since no real "Subscribe" button exists anywhere in this repo yet): the backend already threads an optional `Idempotency-Key` through to Stripe's checkout-session creation, but nothing has ever sent it — whichever frontend builds the first real checkout button must generate one per attempt.
+
 ## [0.21.1] — 2026-08-06
 
 ### Fixed

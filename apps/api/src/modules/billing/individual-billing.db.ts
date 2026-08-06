@@ -1,4 +1,4 @@
-import { individualBilling, eq, count, type DbExecutor } from "@repo/db";
+import { individualBilling, eq, and, or, isNull, lt, count, type DbExecutor } from "@repo/db";
 import type { IndividualPlanId, SubscriptionStatus } from "@repo/core";
 
 // Mirrors organization-billing.db.ts exactly, scoped by userId instead of
@@ -10,6 +10,18 @@ export async function getUserBillingByUserId(tx: DbExecutor, userId: string) {
     .select()
     .from(individualBilling)
     .where(eq(individualBilling.userId, userId));
+  return row ?? null;
+}
+
+/** Read-only lookup by subscription id — mirrors organization-billing.db.ts's identical helper, see its comment. */
+export async function getUserBillingBySubscriptionId(
+  tx: DbExecutor,
+  providerSubscriptionId: string,
+) {
+  const [row] = await tx
+    .select()
+    .from(individualBilling)
+    .where(eq(individualBilling.providerSubscriptionId, providerSubscriptionId));
   return row ?? null;
 }
 
@@ -40,16 +52,29 @@ export async function updateUserBillingByUserId(
   await tx.update(individualBilling).set(values).where(eq(individualBilling.userId, userId));
 }
 
-/** Same reasoning as organization-billing.db.ts's identical change — returns the updated row (or `null`) so the caller can tell whether this table was the match. */
+/**
+ * Same reasoning as organization-billing.db.ts's identical change — returns the updated
+ * row (or `null`) so the caller can tell whether this table was the match, and guards on
+ * `eventCreatedAt` against out-of-order webhook delivery (Fix 3, see that file's comment).
+ */
 export async function updateUserBillingBySubscriptionId(
   tx: DbExecutor,
   providerSubscriptionId: string,
+  eventCreatedAt: Date,
   values: Partial<UserBillingUpdate>,
 ) {
   const [updated] = await tx
     .update(individualBilling)
-    .set(values)
-    .where(eq(individualBilling.providerSubscriptionId, providerSubscriptionId))
+    .set({ ...values, lastEventAt: eventCreatedAt })
+    .where(
+      and(
+        eq(individualBilling.providerSubscriptionId, providerSubscriptionId),
+        or(
+          isNull(individualBilling.lastEventAt),
+          lt(individualBilling.lastEventAt, eventCreatedAt),
+        ),
+      ),
+    )
     .returning();
   return updated ?? null;
 }

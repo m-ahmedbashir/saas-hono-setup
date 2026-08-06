@@ -124,9 +124,12 @@ describe("POST /billing/webhook (individual ownerType)", () => {
     // (e.g. the process got killed mid-suite), failing this test for an unrelated reason.
     const subscriptionId = `sub_test_individual_fake_${Date.now()}`;
     const payload = JSON.stringify({
-      id: "evt_test_individual_checkout_completed",
+      // Unique per run — see billing.integration.test.ts's identical comment on why a
+      // hardcoded event id would collide with the immutable billing_events ledger.
+      id: `evt_test_individual_checkout_completed_${Date.now()}`,
       object: "event",
       type: "checkout.session.completed",
+      created: Math.floor(Date.now() / 1000),
       data: {
         object: {
           id: "cs_test_individual_fake",
