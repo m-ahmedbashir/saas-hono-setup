@@ -52,6 +52,11 @@ APP_ROLE_PASSWORD=<a-real-secret> pnpm --filter @repo/db create-app-role
 pnpm db:generate   # generate SQL migrations from packages/db/src/schema.ts
 pnpm db:migrate    # apply them to your database
 
+# Migrations only seed the two free-tier default plans (enough for entitlement
+# fallbacks to work). Seed the paid tiers too, or upgrading a billing row to
+# "growth"/"individual_pro"/"starter" won't resolve to any real entitlements:
+pnpm --filter @repo/api seed:subscription-plans
+
 pnpm dev           # boots apps/api on http://localhost:8787
 ```
 

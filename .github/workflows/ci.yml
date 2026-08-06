@@ -115,5 +115,16 @@ jobs:
       - name: Run migrations
         run: pnpm db:migrate
 
+      - name: Seed subscription plans
+        # 0017_seed_default_subscription_plans.sql only seeds the two free-tier default
+        # plans (needed so entitlement/seat-limit checks have a fallback on a brand-new
+        # billing row) — the paid tiers (`growth`, `individual_pro`, `starter`) this
+        # script adds have only ever existed in local dev DBs via a manual one-off run,
+        # never in CI's ephemeral database. entitlement.integration.test.ts's "upgrade to
+        # a plan with the feature" cases need those paid-tier rows to exist or they always
+        # fall through to fallbackEntitlements (deny-most) and return 402 regardless of
+        # which plan the billing row is set to.
+        run: pnpm --filter @repo/api seed:subscription-plans
+
       - name: Run tests
         run: pnpm test
