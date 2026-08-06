@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.21.1] — 2026-08-06
+
+### Fixed
+
+- CI's `test` job (`.github/workflows/ci.yml`) failed on a fresh database: `subscription_plans` had zero rows, since the "free" (organization) and "individual_free" (individual) default plans only ever existed in this repo's own long-lived dev database, created by hand at some point rather than by a migration. Every "no billing row yet" entitlement fallback (`entitlement.middleware.ts`/`seat-limit.middleware.ts`) resolves to whichever plan has `isDefault: true` — with no such row, upgraded-plan checks kept 402ing and `GET /subscription-plans` never listed a "free" plan. Added `packages/db/migrations/0017_seed_default_subscription_plans.sql`, an idempotent data migration (`ON CONFLICT` targets the existing partial unique index) that seeds both default plans on any fresh database, verified safe against this repo's own already-seeded dev database too.
+- `account.integration.test.ts`'s sole-owner-blocked deletion test was missing the explicit longer timeout its sibling test right above it already has, and intermittently exceeded vitest's default 5000ms under the shared dev database's real request latency — same class of flake already fixed once in the notifications test suite.
+
 ## [0.21.0] — 2026-08-06
 
 ### Added

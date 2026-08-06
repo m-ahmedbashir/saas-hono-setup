@@ -156,7 +156,7 @@ describe("DELETE /account", () => {
       .from(organizationTable)
       .where(eq(organizationTable.id, org.id));
     expect(orgRow).toBeDefined();
-  });
+  }, 15000);
 
   it("lets a non-owner member delete their own account without touching the org or other members", async () => {
     const owner = await signUp(`account-survivor-owner-${Date.now()}@example.com`);

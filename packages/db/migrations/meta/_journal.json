@@ -120,6 +120,13 @@
       "when": 1785809926256,
       "tag": "0016_notification_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785971283087,
+      "tag": "0017_seed_default_subscription_plans",
+      "breakpoints": true
     }
   ]
 }
