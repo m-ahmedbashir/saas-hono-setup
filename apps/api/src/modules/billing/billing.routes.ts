@@ -8,6 +8,10 @@ import { checkoutRequestSchema, individualCheckoutRequestSchema } from "./billin
 import {
   organizationCheckoutHandler,
   individualCheckoutHandler,
+  getOrganizationBillingHandler,
+  getIndividualBillingHandler,
+  cancelOrganizationBillingHandler,
+  cancelIndividualBillingHandler,
   webhookRequestHandler,
 } from "./billing.controller";
 
@@ -50,6 +54,21 @@ export const billingRoutes = new Hono()
     validateIndividualCheckoutBody,
     individualCheckoutHandler,
   )
+  // Any active-org member can view — read-only org-shared info, same reasoning as
+  // GET /organization-profile, not a role-gated action.
+  .get("/organization", injectUserContext, getOrganizationBillingHandler)
+  // Ownership-based, same reasoning as /individual-checkout above.
+  .get("/individual", injectUserContext, getIndividualBillingHandler)
+  // Owner/admin only, same permission as organization-checkout — canceling the org's
+  // subscription is exactly as sensitive as starting one.
+  .post(
+    "/organization-cancel",
+    injectUserContext,
+    requirePermission({ billing: ["manage"] }),
+    cancelOrganizationBillingHandler,
+  )
+  // Ownership-based, same reasoning as /individual-checkout above.
+  .post("/individual-cancel", injectUserContext, cancelIndividualBillingHandler)
   // Not wrapped in the success/failure envelope — Stripe only checks HTTP status on
   // this endpoint, never the body shape, same reasoning as /health and /api/auth's
   // envelope exclusion in AGENTS.md.
