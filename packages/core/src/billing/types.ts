@@ -15,6 +15,22 @@ export interface CheckoutSessionResult {
 }
 
 /**
+ * Every variant's common envelope, needed for `billing_events`' ledger row — not for any
+ * billing *logic*, which is why it's factored out instead of repeated per variant.
+ * `stripeEventId`/`eventCreatedAt` are Stripe's own `id`/`created` fields (the latter is
+ * the ordering guard `organization_billing`/`individual_billing`'s `lastEventAt` columns
+ * compare against — see specs/billing-integrity-plan.md's Fix 3); `rawPayload` is the
+ * verbatim event object the ledger stores as-is. `apps/api`'s `billing.handlers.ts` reads
+ * these three fields to write the ledger row without ever touching a Stripe type itself —
+ * they're already plain data by the time `parseWebhookEvent` hands them back.
+ */
+interface BillingEventEnvelope {
+  stripeEventId: string;
+  eventCreatedAt: Date;
+  rawPayload: Record<string, unknown>;
+}
+
+/**
  * Normalized webhook outcomes, vendor-specific event types already translated
  * away. Without this, the webhook *route* would have to import the vendor SDK
  * itself just to read event payloads — defeating the "swap vendor, touch zero
@@ -25,31 +41,60 @@ export interface CheckoutSessionResult {
  * different tables (`organization_billing` vs `individual_billing`) — the handler
  * branches on `ownerType` to decide which one, even though `planId` itself is now the
  * same `string` type on both branches.
+ *
+ * `invoice_paid`/`invoice_payment_failed`/`charge_refunded`/`charge_dispute_created`
+ * deliberately don't carry `ownerType`/`ownerId`/`planId` — unlike `checkout_completed`,
+ * these never originate one, so there's nothing to widen into `OrganizationPlanId` union
+ * for. `billing.handlers.ts` resolves the owning row the same way it already does for
+ * `subscription_updated`/`subscription_canceled`: look it up by `providerSubscriptionId`/
+ * `paymentIntentId` against the already-durable `organization_billing`/`individual_billing`/
+ * `invoices` tables, not from anything Stripe echoes back on the event itself.
  */
-export type BillingEvent =
-  | {
-      type: "checkout_completed";
-      ownerType: "organization";
-      ownerId: string;
-      providerCustomerId: string;
-      providerSubscriptionId: string;
-      planId: OrganizationPlanId;
-    }
-  | {
-      type: "checkout_completed";
-      ownerType: "individual";
-      ownerId: string;
-      providerCustomerId: string;
-      providerSubscriptionId: string;
-      planId: IndividualPlanId;
-    }
-  | {
-      type: "subscription_updated";
-      providerSubscriptionId: string;
-      status: SubscriptionStatus;
-      seatQuantity: number;
-    }
-  | { type: "subscription_canceled"; providerSubscriptionId: string };
+export type BillingEvent = BillingEventEnvelope &
+  (
+    | {
+        type: "checkout_completed";
+        ownerType: "organization";
+        ownerId: string;
+        providerCustomerId: string;
+        providerSubscriptionId: string;
+        planId: OrganizationPlanId;
+      }
+    | {
+        type: "checkout_completed";
+        ownerType: "individual";
+        ownerId: string;
+        providerCustomerId: string;
+        providerSubscriptionId: string;
+        planId: IndividualPlanId;
+      }
+    | {
+        type: "subscription_updated";
+        providerSubscriptionId: string;
+        status: SubscriptionStatus;
+        seatQuantity: number;
+      }
+    | { type: "subscription_canceled"; providerSubscriptionId: string }
+    | {
+        type: "invoice_paid";
+        providerSubscriptionId: string;
+        stripeInvoiceId: string;
+        // The `invoices` table's join key for a later charge_refunded — a PaymentIntent
+        // id, not a Charge id. Verified against the installed stripe@22.3.2 types:
+        // Stripe's newer API decoupled Charge from Invoice entirely (no `charge.invoice`
+        // field exists), while `payment_intent` is a stable, always-present field on
+        // both `Charge` and `InvoicePayment.Payment`. Nullable because it depends on the
+        // invoice's `payments` sub-list actually being present on the webhook payload —
+        // see stripe-billing.service.ts's extraction comment for the exact caveat.
+        paymentIntentId: string | null;
+        amountTotal: number;
+        currency: string;
+        receiptUrl: string | null;
+      }
+    | { type: "invoice_payment_failed"; providerSubscriptionId: string }
+    | { type: "charge_refunded"; paymentIntentId: string }
+    | { type: "charge_dispute_created"; paymentIntentId: string | null }
+  );
 
 /**
  * Vendor-agnostic billing contract. `packages/core` only knows this shape —

@@ -178,6 +178,14 @@ export const organizationBilling = pgTable(
     // Matches @repo/core's SubscriptionStatus ("active" | "past_due" | "canceled" | "incomplete").
     subscriptionStatus: text("subscription_status"),
     seatQuantity: integer("seat_quantity"),
+    // Stripe's own `created` timestamp on the most recent webhook event actually applied
+    // to this row — NOT when we received it. Webhook delivery is at-least-once but not
+    // ordered; every subscription-lifecycle update guards on this (see
+    // specs/billing-integrity-plan.md's Fix 3) so a late-arriving retry of an older event
+    // can never overwrite a row a newer event already corrected. NULL until the first
+    // lifecycle event lands (checkout_completed doesn't set this — only
+    // subscription_updated/subscription_canceled do, since only those can race).
+    lastEventAt: timestamp("last_event_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -271,6 +279,9 @@ export const individualBilling = pgTable(
     // Unique as defense-in-depth — same reasoning as organizationBilling above.
     providerSubscriptionId: text("provider_subscription_id").unique(),
     subscriptionStatus: text("subscription_status"),
+    // Same event-ordering guard as organizationBilling.lastEventAt — see its comment and
+    // specs/billing-integrity-plan.md's Fix 3.
+    lastEventAt: timestamp("last_event_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -285,6 +296,97 @@ export const individualBillingRelations = relations(individualBilling, ({ one })
     fields: [individualBilling.userId],
     references: [user.id],
   }),
+}));
+
+// Append-only audit log of every Stripe webhook event this app has ever received —
+// never UPDATEd, never DELETEd (enforced at the Postgres level, see the RLS migration's
+// sibling custom migration that REVOKEs UPDATE/DELETE from app_user; a plain schema
+// migration can't express a REVOKE). System-populated, not owner-scoped app data —
+// deliberately NOT RLS-enabled, same reasoning as subscriptionPlans below: there's no
+// single session-scoped owner to check against, and the webhook handler already runs
+// under withSystemScope. See specs/billing-integrity-plan.md.
+export const billingEvents = pgTable(
+  "billing_events",
+  {
+    id: text("id").primaryKey(),
+    // Stripe's own evt_... id — the actual idempotency guard (see insertBillingEvent's
+    // doc comment): a duplicate webhook delivery hits this unique constraint and the
+    // insert fails, which is how the caller knows to skip reprocessing.
+    stripeEventId: text("stripe_event_id").notNull().unique(),
+    type: text("type").notNull(),
+    ownerType: text("owner_type"),
+    ownerId: text("owner_id"),
+    // Stripe's own `created` field on the event — logical order, not arrival order. Used
+    // to guard organizationBilling/individualBilling's current-state updates against
+    // out-of-order delivery (see their lastEventAt columns' comments).
+    eventCreatedAt: timestamp("event_created_at").notNull(),
+    payload: jsonb("payload").notNull(),
+    // When *we* received it — kept distinct from eventCreatedAt on purpose, never used
+    // for ordering decisions.
+    receivedAt: timestamp("received_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("billing_events_owner_idx").on(table.ownerType, table.ownerId),
+    index("billing_events_type_idx").on(table.type),
+  ],
+);
+
+// Curated, one-row-per-real-transaction receipt/order record — what a "billing history"
+// page or a "download receipt" button reads from, as opposed to billingEvents' raw JSONB.
+// Populated from invoice.paid/charge.refunded specifically, not every event type. Not
+// RLS-enabled for the same system-populated reasoning as billingEvents; unlike that
+// table, normal app_user grants apply here — marking a row refunded is a real,
+// intentional mutation, not a bug to guard against.
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: text("id").primaryKey(),
+    ownerType: text("owner_type").notNull(),
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    // Snapshot at purchase time — NOT a live FK to subscriptionPlans, since a plan can be
+    // edited/deactivated later and a receipt must keep reflecting what was actually true
+    // when the money moved.
+    planId: text("plan_id").notNull(),
+    // In cents, matches Stripe's own integer-cents convention.
+    amountTotal: integer("amount_total").notNull(),
+    currency: text("currency").notNull(),
+    // "paid" | "refunded" | "partially_refunded"
+    status: text("status").notNull(),
+    stripeInvoiceId: text("stripe_invoice_id").unique(),
+    // The join key a later `charge.refunded` event correlates back to this row with.
+    // Deliberately the PaymentIntent id, not the Charge id — verified against the
+    // installed stripe@22.3.2 types: Stripe's newer API decoupled Charge from Invoice
+    // entirely (no `charge.invoice` field exists at all in this API version), while
+    // `charge.payment_intent` is a stable, always-present top-level field. Nullable
+    // because it depends on the invoice's `payments` sub-list actually being present on
+    // the webhook payload — see stripe-billing.service.ts's parseWebhookEvent comment on
+    // invoice_paid for the exact caveat.
+    stripePaymentIntentId: text("stripe_payment_intent_id").unique(),
+    providerSubscriptionId: text("provider_subscription_id").notNull(),
+    // Stripe's own hosted invoice page — no reason to build a PDF generator when Stripe
+    // already hosts one per invoice (hosted_invoice_url, always present, no expansion
+    // needed — simpler and more reliable than chasing a Charge's own receipt_url).
+    receiptUrl: text("receipt_url"),
+    // The real transaction date, taken from the Stripe payload — not this row's insert
+    // time, which may lag behind it.
+    issuedAt: timestamp("issued_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("invoices_organizationId_idx").on(table.organizationId),
+    index("invoices_userId_idx").on(table.userId),
+  ],
+);
+
+export const invoicesRelations = relations(invoices, ({ one }) => ({
+  organization: one(organization, {
+    fields: [invoices.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, { fields: [invoices.userId], references: [user.id] }),
 }));
 
 // Admin-editable plan catalog — replaces the two hardcoded organizationPlans/

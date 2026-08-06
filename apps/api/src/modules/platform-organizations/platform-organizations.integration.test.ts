@@ -535,6 +535,7 @@ describe("GET /platform-organizations/:organizationId", () => {
         orgNumber: string | null;
         suspended: boolean | null;
         members: { userId: string; email: string; role: string }[];
+        invoices: { id: string; amountTotal: number; status: string }[];
       };
     };
     expect(body.data.id).toBe(orgId);
@@ -548,5 +549,9 @@ describe("GET /platform-organizations/:organizationId", () => {
     expect(body.data.members.some((m) => m.email === memberEmail && m.role === "member")).toBe(
       true,
     );
+    // No billing activity happened for this org — proves the new field (see
+    // specs/billing-integrity-plan.md) is genuinely wired through, not just present by
+    // accident; the field's actual content is proven by billing-integrity.integration.test.ts.
+    expect(body.data.invoices).toEqual([]);
   }, 20000);
 });
