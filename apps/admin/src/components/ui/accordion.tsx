@@ -4,7 +4,7 @@ import * as React from "react";
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion";
 import { Icons } from "@/components/icons";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@repo/shared/utils";
 
 function Accordion({ ...props }: AccordionPrimitive.Root.Props) {
   return <AccordionPrimitive.Root data-slot="accordion" {...props} />;

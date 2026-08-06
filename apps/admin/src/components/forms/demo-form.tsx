@@ -32,7 +32,7 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Icons } from "@/components/icons";
-import { cn } from "@/lib/utils";
+import { cn } from "@repo/shared/utils";
 
 // Schema (form-level safety net — onSubmit catches anything field-level missed)
 const demoFormSchema = z.object({

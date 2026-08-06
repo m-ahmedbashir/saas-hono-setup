@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+import { cn } from "@repo/shared/utils";
 
 interface DataTableColumnHeaderProps<TData, TValue> extends React.ComponentProps<
   typeof DropdownMenuTrigger

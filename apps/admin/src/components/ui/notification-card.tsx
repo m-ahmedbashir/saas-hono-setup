@@ -2,7 +2,7 @@
 
 import type { FC } from "react";
 import { Icons } from "@/components/icons";
-import { cn } from "@/lib/utils";
+import { cn } from "@repo/shared/utils";
 
 export type NotificationStatus = "unread" | "read" | "archived";
 export type ActionType = "redirect" | "api_call" | "workflow" | "modal";

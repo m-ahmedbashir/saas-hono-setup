@@ -3,7 +3,7 @@ import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { cookies } from "next/headers";
 import PageContainer from "@/components/layout/page-container";
 import { PlatformAccessGate } from "@/components/platform-access-gate";
-import { getQueryClient } from "@/lib/query-client";
+import { getQueryClient } from "@repo/shared/query-client";
 import { platformOrganizationDetailQueryOptions } from "@/features/organizations/api/queries";
 import { OrganizationDetailView } from "@/features/organizations/components/organization-detail/organization-detail-view";
 import { OrganizationDetailSkeleton } from "@/features/organizations/components/organization-detail/organization-detail-skeleton";

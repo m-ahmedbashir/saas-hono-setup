@@ -1,5 +1,5 @@
 import { mutationOptions } from "@tanstack/react-query";
-import { getQueryClient } from "@/lib/query-client";
+import { getQueryClient } from "@repo/shared/query-client";
 import {
   createEmployee,
   setStaffRole,

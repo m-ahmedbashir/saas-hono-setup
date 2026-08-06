@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
-import { cn } from "@/lib/utils";
+import { cn } from "@repo/shared/utils";
 import { Icons } from "@/components/icons";
 import { DataTableFilterClear } from "@/components/ui/table/data-table-filter-clear";
 
