@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.23.0] — 2026-08-06
+
+### Added
+
+- Platform staff can now see billing history directly on an organization's or individual's detail page in `apps/admin` — a new "Billing History" section (date, plan, amount, status, link to Stripe's hosted receipt) backed by the `invoices` table added in 0.22.0. `GET /platform-organizations/:organizationId` and `GET /platform-individuals/:userId` both now return an `invoices` array, following the same pattern as the existing `members`/`organizations` fields — no new route, permission tier, or endpoint needed. New shared `apps/admin/src/components/billing-history-table.tsx`, reused by both the organization and individual billing tabs since the underlying row shape is identical for both.
+
 ## [0.22.0] — 2026-08-06
 
 ### Added

@@ -384,6 +384,7 @@ describe("GET /platform-individuals/:userId", () => {
         plan: string | null;
         subscriptionStatus: string | null;
         organizations: unknown[];
+        invoices: unknown[];
       };
     };
     expect(body.data.id).toBe(target.userId);
@@ -392,5 +393,9 @@ describe("GET /platform-individuals/:userId", () => {
     expect(body.data.plan).toBe("individual_free");
     expect(body.data.subscriptionStatus).toBe("active");
     expect(body.data.organizations).toEqual([]);
+    // No billing activity happened for this account — proves the new field (see
+    // specs/billing-integrity-plan.md) is genuinely wired through; the field's actual
+    // content is proven by billing-integrity.integration.test.ts.
+    expect(body.data.invoices).toEqual([]);
   }, 20000);
 });

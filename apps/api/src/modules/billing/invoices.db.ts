@@ -1,4 +1,4 @@
-import { invoices, eq, type AnyExecutor } from "@repo/db";
+import { invoices, eq, desc, type AnyExecutor } from "@repo/db";
 import { AppError } from "@repo/core";
 
 // invoices isn't RLS-enabled either (same system-populated reasoning as billingEvents),
@@ -53,4 +53,22 @@ export async function markInvoiceRefunded(tx: AnyExecutor, stripePaymentIntentId
     );
   }
   return updated;
+}
+
+/** Backs the platform-organizations detail page's billing history — newest first, same ordering convention as every other list in this repo. */
+export async function listInvoicesByOrganizationId(tx: AnyExecutor, organizationId: string) {
+  return tx
+    .select()
+    .from(invoices)
+    .where(eq(invoices.organizationId, organizationId))
+    .orderBy(desc(invoices.issuedAt));
+}
+
+/** Mirrors listInvoicesByOrganizationId exactly, scoped by userId — backs platform-individuals' billing history. */
+export async function listInvoicesByUserId(tx: AnyExecutor, userId: string) {
+  return tx
+    .select()
+    .from(invoices)
+    .where(eq(invoices.userId, userId))
+    .orderBy(desc(invoices.issuedAt));
 }

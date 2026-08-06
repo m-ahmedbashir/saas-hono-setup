@@ -38,6 +38,20 @@ export type PlatformIndividualsResponse = {
   total: number;
 };
 
+// Backed by the new `invoices` table (specs/billing-integrity-plan.md) — a curated,
+// one-row-per-real-transaction receipt record, distinct from the raw `billing_events`
+// audit ledger. `receiptUrl` is Stripe's own hosted invoice page, not a PDF this app
+// generates.
+export interface PlatformIndividualInvoice {
+  id: string;
+  planId: string;
+  amountTotal: number;
+  currency: string;
+  status: string;
+  receiptUrl: string | null;
+  issuedAt: Date;
+}
+
 // Everything listIndividualsPage's summary row deliberately leaves out (address,
 // raw Stripe ids) — a detail page can afford the heavier shape a table row showing
 // every account on the platform cannot.
@@ -61,4 +75,5 @@ export interface PlatformIndividualDetail {
   providerCustomerId: string | null;
   providerSubscriptionId: string | null;
   organizations: PlatformIndividualOrganization[];
+  invoices: PlatformIndividualInvoice[];
 }

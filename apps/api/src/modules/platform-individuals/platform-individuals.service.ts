@@ -6,6 +6,7 @@ import {
   getIndividualDetail,
   getOrganizationMemberships,
 } from "./platform-individuals.db";
+import { listInvoicesByUserId } from "../billing/invoices.db";
 
 export interface PlatformIndividualOrganization {
   id: string;
@@ -92,6 +93,16 @@ export async function listPlatformIndividuals(params: {
   });
 }
 
+export interface PlatformIndividualInvoice {
+  id: string;
+  planId: string;
+  amountTotal: number;
+  currency: string;
+  status: string;
+  receiptUrl: string | null;
+  issuedAt: Date;
+}
+
 export interface PlatformIndividualDetail {
   id: string;
   name: string;
@@ -112,6 +123,7 @@ export interface PlatformIndividualDetail {
   providerCustomerId: string | null;
   providerSubscriptionId: string | null;
   organizations: PlatformIndividualOrganization[];
+  invoices: PlatformIndividualInvoice[];
 }
 
 export async function getPlatformIndividualDetail(
@@ -123,13 +135,25 @@ export async function getPlatformIndividualDetail(
       throw new AppError("NOT_FOUND", "Individual not found");
     }
 
-    const memberships = await getOrganizationMemberships(tx, [userId]);
+    const [memberships, invoiceRows] = await Promise.all([
+      getOrganizationMemberships(tx, [userId]),
+      listInvoicesByUserId(tx, userId),
+    ]);
     const organizations = memberships.map((membership) => ({
       id: membership.organizationId,
       name: membership.organizationName,
       role: membership.role,
     }));
+    const invoices: PlatformIndividualInvoice[] = invoiceRows.map((row) => ({
+      id: row.id,
+      planId: row.planId,
+      amountTotal: row.amountTotal,
+      currency: row.currency,
+      status: row.status,
+      receiptUrl: row.receiptUrl,
+      issuedAt: row.issuedAt,
+    }));
 
-    return { ...detail, organizations };
+    return { ...detail, organizations, invoices };
   });
 }

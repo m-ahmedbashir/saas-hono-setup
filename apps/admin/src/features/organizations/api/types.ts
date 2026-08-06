@@ -67,6 +67,20 @@ export interface PlatformOrganizationMember {
   joinedAt: Date;
 }
 
+// Backed by the new `invoices` table (specs/billing-integrity-plan.md) — a curated,
+// one-row-per-real-transaction receipt record, distinct from the raw `billing_events`
+// audit ledger. `receiptUrl` is Stripe's own hosted invoice page, not a PDF this app
+// generates.
+export interface PlatformOrganizationInvoice {
+  id: string;
+  planId: string;
+  amountTotal: number;
+  currency: string;
+  status: string;
+  receiptUrl: string | null;
+  issuedAt: Date;
+}
+
 // Everything listOrganizationsPage's summary row deliberately leaves out (address,
 // description, raw Stripe ids, the full member list) — a detail page can afford the
 // heavier shape a table row showing every org on the platform cannot.
@@ -96,4 +110,5 @@ export interface PlatformOrganizationDetail {
   addressPostalCode: string | null;
   addressCountry: string | null;
   members: PlatformOrganizationMember[];
+  invoices: PlatformOrganizationInvoice[];
 }
