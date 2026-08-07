@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.25.0] — 2026-08-07
+
+### Added
+
+- `apps/portal` — the customer-facing frontend from `specs/customer-portal-plan.md`: sign-up, sign-in, and a self-service profile page (name/password), on the same Next.js 16/Tailwind v4/shadcn stack as `apps/admin`, running on its own origin (`localhost:3002` in dev). `organizationClient()` only — no `adminClient`/platform roles, since this audience is never platform staff. `proxy.ts` gates `/profile`/`/billing`/`/team` on session-cookie presence (same presence-only pattern as `apps/admin`'s, real enforcement stays server-side), with `/auth/accept-invite` deliberately excluded from the "already signed in, bounce to /profile" rule — an existing member must be able to reach it to accept an invitation to a second org. `ALLOWED_ORIGINS` now includes the new origin so `apps/api` accepts it. Billing and team-management pages are not yet built — profile is the first vertical slice, proving the app boots, builds, and does a real sign-up/sign-in round trip against `apps/api` end to end (verified live, not just unit-tested, same standard as the original admin sign-in flow).
+- New `packages/shared` (originally scaffolded as `packages/ui`, renamed before anything else depended on it — "ui" implies visual components, which deliberately never live here; shadcn primitives are vendored per-app instead) — the two-line `apiFetch`/`ApiError`/`getQueryClient`/`cn`/`formatBytes` grab-bag both `apps/admin` and `apps/portal` need, extracted from `apps/admin/src/lib/*`. `apps/admin`'s own 86 call sites were repointed at the new package with zero behavior change (confirmed via its full existing test suite passing unmodified).
+
 ## [0.24.0] — 2026-08-06
 
 ### Added

@@ -72,7 +72,7 @@ describe("SignInView", () => {
     );
   });
 
-  it("redirects to /dashboard/overview after a successful sign-in", async () => {
+  it("redirects to /profile after a successful sign-in", async () => {
     signInEmailMock.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
     const user = userEvent.setup();
     render(<SignInView />);
@@ -81,7 +81,7 @@ describe("SignInView", () => {
     await user.type(screen.getByLabelText("Password"), "password1234");
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/dashboard/overview"));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/profile"));
   });
 
   it("shows the server's error message and does not redirect when sign-in fails", async () => {

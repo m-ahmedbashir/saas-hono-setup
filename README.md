@@ -57,7 +57,7 @@ pnpm db:migrate    # apply them to your database
 # "growth"/"individual_pro"/"starter" won't resolve to any real entitlements:
 pnpm --filter @repo/api seed:subscription-plans
 
-pnpm dev           # boots apps/api on http://localhost:8787
+pnpm dev           # boots every app via Turborepo: apps/api :8787, apps/admin :3000, apps/portal :3002
 ```
 
 Confirm it's up:
@@ -103,11 +103,14 @@ See `.env.example` for the full list with comments. Summary:
 ## Project structure
 
 ```
-apps/api/                  Hono server — the only deployable app right now
+apps/api/                  Hono server — the backend every frontend app talks to
   src/index.ts              entrypoint: middleware chain, route composition, exports AppType for RPC clients
   src/middleware/            injectUserContext (auth), requirePermission (PBAC), requireFeature (plan entitlements)
   src/lib/                   response.ts — the API's success/error envelope
   src/modules/auth/          proxies to Better Auth's own handler
+
+apps/admin/                 Next.js staff back office (platform admin/support) — see apps/admin/AGENTS.md
+apps/portal/                Next.js customer-facing app (B2B org members + B2C individuals) — see specs/customer-portal-plan.md
 
 packages/db/                Drizzle schema + client, owns migrations
   src/schema.ts              table definitions (auth tables are generated, see below)
@@ -116,6 +119,8 @@ packages/db/                Drizzle schema + client, owns migrations
 packages/core/              environment-agnostic domain logic — no Hono, no HTTP
   src/auth/                  Better Auth config + access control (permissions)
   src/errors.ts              AppError + error codes, shared by the whole API
+
+packages/shared/            Cross-app frontend infrastructure (apiFetch, getQueryClient, cn) — not shadcn components, those are vendored per app
 ```
 
 ## Architecture
@@ -155,7 +160,7 @@ Run from the repo root (fans out via Turborepo) or scoped with `--filter @repo/a
 
 | Script              | What it does                                              |
 | ------------------- | --------------------------------------------------------- |
-| `pnpm dev`          | Start `apps/api` in watch mode                            |
+| `pnpm dev`          | Start every app (fans out via Turborepo)                  |
 | `pnpm build`        | Compile all packages                                      |
 | `pnpm test`         | Run tests                                                 |
 | `pnpm typecheck`    | `tsc --noEmit` across the monorepo                        |

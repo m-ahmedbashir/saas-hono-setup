@@ -1,28 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAppForm } from "@/components/ui/tanstack-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Icons } from "@/components/icons";
 import { authClient } from "@/lib/auth-client";
-import { signInSchema, type SignInValues } from "../schemas/sign-in.schema";
+import { signUpSchema, type SignUpValues } from "../schemas/sign-up.schema";
 
-export function SignInView() {
+// Better Auth's emailAndPassword config has no `autoSignIn: false` override (see
+// packages/core/src/auth/index.ts), so its default (true) applies — a successful signUp
+// call already establishes a real session, no separate sign-in step needed afterward.
+export function SignUpView() {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
 
   const form = useAppForm({
-    defaultValues: { email: "", password: "", rememberMe: true } as SignInValues,
-    validators: { onSubmit: signInSchema },
+    defaultValues: { name: "", email: "", password: "" } as SignUpValues,
+    validators: { onSubmit: signUpSchema },
     onSubmit: async ({ value }) => {
       setFormError(null);
-      // authClient.signIn.email never throws for expected auth failures — it resolves
-      // { data, error }, same contract as every other Better Auth client call.
-      const { error } = await authClient.signIn.email(value);
+      const { error } = await authClient.signUp.email(value);
       if (error) {
-        setFormError(error.message ?? "Sign in failed");
+        setFormError(error.message ?? "Sign up failed");
         return;
       }
       router.push("/profile");
@@ -31,14 +31,22 @@ export function SignInView() {
 
   return (
     <form.AppForm>
-      <form.Form className="gap-4 p-2 md:p-0" id="sign-in-form">
+      <form.Form className="gap-4 p-2 md:p-0" id="sign-up-form">
         {formError && (
           <Alert variant="destructive">
             <Icons.alertCircle className="size-4" />
-            <AlertTitle>Sign in failed</AlertTitle>
+            <AlertTitle>Sign up failed</AlertTitle>
             <AlertDescription>{formError}</AlertDescription>
           </Alert>
         )}
+        <form.TextField
+          name="name"
+          label="Name"
+          icon={Icons.user}
+          autoComplete="name"
+          placeholder="Your name"
+          autoFocus
+        />
         <form.TextField
           name="email"
           label="Email"
@@ -48,29 +56,19 @@ export function SignInView() {
           autoComplete="email"
           spellCheck={false}
           placeholder="you@example.com"
-          autoFocus
         />
         <form.TextField
           name="password"
           label="Password"
           type="password"
-          placeholder="••••••••"
+          placeholder="At least 8 characters"
           icon={Icons.lock}
-          autoComplete="current-password"
-          labelSuffix={
-            <Link
-              href="/auth/forgot-password"
-              className="text-muted-foreground hover:text-primary text-sm underline underline-offset-4"
-            >
-              Forgot password?
-            </Link>
-          }
+          autoComplete="new-password"
         />
-        <form.CheckboxField name="rememberMe" label="Remember me" />
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(isSubmitting) => (
             <form.SubmitButton className="mt-1 w-full" size="lg">
-              {isSubmitting ? "Signing in…" : "Sign in"}
+              {isSubmitting ? "Creating account…" : "Create account"}
             </form.SubmitButton>
           )}
         </form.Subscribe>
