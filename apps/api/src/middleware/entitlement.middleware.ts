@@ -6,13 +6,13 @@ import { getBillingByOrgId } from "../modules/billing/organization-billing.db";
 import { getUserBillingByUserId } from "../modules/billing/individual-billing.db";
 import {
   resolveEntitlementsForPlan,
-  getDefaultPlanId,
+  currentPlanId,
 } from "../modules/subscription-plans/subscription-plans.service";
 
 /**
  * The one entitlement gate for the whole app, for either billing universe — see
  * AGENTS.md's Feature Entitlements section. Requires `injectUserContext` to have run
- * first, same precondition as `requirePermission`/`enforceSeatLimit`.
+ * first, same precondition as `requirePermission`.
  *
  * `scope` is required, not inferred from `userContext.mode`: a B2B2C session having an
  * active organization doesn't mean every route it hits is an org-level feature (e.g. a
@@ -50,21 +50,15 @@ async function organizationHasFeature(
   organizationId: string,
   feature: FeatureKey,
 ): Promise<boolean> {
-  const existingPlanId = await withOrgScope(organizationId, async (tx) => {
-    const row = await getBillingByOrgId(tx, organizationId);
-    return row?.plan;
-  });
-  const planId = existingPlanId ?? (await getDefaultPlanId("organization"));
+  const row = await withOrgScope(organizationId, (tx) => getBillingByOrgId(tx, organizationId));
+  const planId = await currentPlanId("organization", row);
   const entitlements = await resolveEntitlementsForPlan("organization", planId, organizationId);
   return canAccessFeature(entitlements, feature);
 }
 
 async function individualHasFeature(userId: string, feature: FeatureKey): Promise<boolean> {
-  const existingPlanId = await withUserScope(userId, async (tx) => {
-    const row = await getUserBillingByUserId(tx, userId);
-    return row?.plan;
-  });
-  const planId = existingPlanId ?? (await getDefaultPlanId("individual"));
+  const row = await withUserScope(userId, (tx) => getUserBillingByUserId(tx, userId));
+  const planId = await currentPlanId("individual", row);
   const entitlements = await resolveEntitlementsForPlan("individual", planId, null);
   return canAccessFeature(entitlements, feature);
 }

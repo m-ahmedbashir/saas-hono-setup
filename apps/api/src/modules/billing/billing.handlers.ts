@@ -140,6 +140,7 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
             providerSubscriptionId: event.providerSubscriptionId,
             plan: event.planId,
             subscriptionStatus: "active",
+            ...(event.seatQuantity !== null && { seatQuantity: event.seatQuantity }),
           });
         } else {
           await ensureUserBillingRow(tx, event.ownerId);
@@ -271,7 +272,7 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
  *
  * An ended subscription returns the row to its owner type's default plan, keeping the
  * subscription id. `plan` is what entitlements (entitlement.middleware.ts) and seat limits
- * (seat-limit.middleware.ts) resolve from, so leaving the paid plan on a canceled row would
+ * (billing.service.ts's getOrganizationSeatLimit) resolve from, so leaving the paid plan on a canceled row would
  * keep granting it forever. Resetting it here — in the webhook, the single writer of
  * subscription state — keeps every reader correct without each one re-deriving "is this
  * plan still paid for?". History isn't lost: billing_events/invoices keep what was paid.

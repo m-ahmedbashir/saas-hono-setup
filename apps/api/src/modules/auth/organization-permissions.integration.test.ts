@@ -1,8 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { serve, type ServerType } from "@hono/node-server";
-import { db, eq, user as userTable, member as memberTable } from "@repo/db";
+import {
+  db,
+  eq,
+  inArray,
+  withOrgScope,
+  user as userTable,
+  member as memberTable,
+  organization as organizationTable,
+  subscriptionPlans as plansTable,
+} from "@repo/db";
 import { auth } from "@repo/core/auth";
 import { app } from "../../app";
+import { getDefaultPlanId } from "../subscription-plans/subscription-plans.service";
+import { ensureBillingRow, updateBillingByOrgId } from "../billing/organization-billing.db";
 
 // Proves packages/core/src/auth/permissions.ts's `member`/`invitation` grants actually
 // work end to end through Better Auth's own organization plugin routes (invite-member,
@@ -20,6 +31,7 @@ const ORIGIN = "http://localhost:3000";
 let server: ServerType;
 const cleanupUserIds: string[] = [];
 const cleanupOrgIds: string[] = [];
+const cleanupPlanIds: string[] = [];
 
 async function signUp(email: string) {
   const res = await fetch(`http://localhost:${PORT}/api/auth/sign-up/email`, {
@@ -51,8 +63,15 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
+  if (cleanupPlanIds.length > 0) {
+    await db.delete(plansTable).where(inArray(plansTable.id, cleanupPlanIds));
+  }
   for (const orgId of cleanupOrgIds) {
     await db.delete(memberTable).where(eq(memberTable.organizationId, orgId));
+  }
+  // Cascades each org's billing row, custom plans and invitations too.
+  if (cleanupOrgIds.length > 0) {
+    await db.delete(organizationTable).where(inArray(organizationTable.id, cleanupOrgIds));
   }
   for (const userId of cleanupUserIds) {
     await db.delete(userTable).where(eq(userTable.id, userId));
@@ -227,4 +246,137 @@ describe("Organization member/invitation permissions", () => {
       .where(eq(memberTable.userId, bystander.userId));
     expect(bystanderRow?.role).toBe("member");
   }, 20000);
+});
+
+// Seat limits are enforced by Better Auth's own hooks, wired in packages/core's auth config
+// to apps/api's getOrganizationSeatUsage: `invitationLimit` stops inviting more people than
+// there are free seats, and `membershipLimit` is checked on every accepted invitation and
+// every addMember — so there's no path to joining past the limit.
+describe("Organization seat limit", () => {
+  async function invite(ownerCookie: string, organizationId: string, email: string) {
+    return fetch(`http://localhost:${PORT}/api/auth/organization/invite-member`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: ownerCookie },
+      body: JSON.stringify({ organizationId, email, role: "member" }),
+    });
+  }
+
+  async function accept(cookie: string, invitationId: string) {
+    return fetch(`http://localhost:${PORT}/api/auth/organization/accept-invitation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: cookie },
+      body: JSON.stringify({ invitationId }),
+    });
+  }
+
+  // A seat deal for one org only: a custom plan reusing the default plan's slug replaces
+  // the shared default for that org (custom-then-shared precedence) — no billing row
+  // changes, nothing shared touched. The slug is looked up, not assumed to be "free".
+  async function giveOrgSeatLimit(organizationId: string, seatLimit: number) {
+    const id = crypto.randomUUID();
+    cleanupPlanIds.push(id);
+    await db.insert(plansTable).values({
+      id,
+      ownerType: "organization",
+      planId: await getDefaultPlanId("organization"),
+      organizationId,
+      name: `${seatLimit} Seats`,
+      seatLimit,
+      isActive: true,
+      isDefault: false,
+    });
+    return id;
+  }
+
+  async function newOrg(label: string) {
+    const owner = await signUp(`org-seats-${label}-owner-${Date.now()}@example.com`);
+    cleanupUserIds.push(owner.userId);
+    const orgId = await createOrg(owner.cookie, `Seat ${label} Org`);
+    cleanupOrgIds.push(orgId);
+    return { owner, orgId };
+  }
+
+  it("refuses an invitation once every free seat is already taken or invited", async () => {
+    const { owner, orgId } = await newOrg("invite");
+    await giveOrgSeatLimit(orgId, 2);
+
+    // Owner holds 1 of 2 seats, so exactly one invitation can be outstanding.
+    expect(
+      (await invite(owner.cookie, orgId, `org-seats-a-${Date.now()}@example.com`)).status,
+    ).toBe(200);
+    const refused = await invite(owner.cookie, orgId, `org-seats-b-${Date.now()}@example.com`);
+    const body = (await refused.json()) as { code?: string };
+    expect(refused.status).toBe(403);
+    expect(body.code).toBe("INVITATION_LIMIT_REACHED");
+  }, 30000);
+
+  it("refuses to let anyone join past the limit, even holding an invitation sent before it dropped", async () => {
+    const { owner, orgId } = await newOrg("accept");
+    const planRowId = await giveOrgSeatLimit(orgId, 3);
+
+    const firstEmail = `org-seats-first-${Date.now()}@example.com`;
+    const secondEmail = `org-seats-second-${Date.now()}@example.com`;
+    const firstInvitation = (await (await invite(owner.cookie, orgId, firstEmail)).json()) as {
+      id: string;
+    };
+    const secondInvitation = (await (await invite(owner.cookie, orgId, secondEmail)).json()) as {
+      id: string;
+    };
+
+    // The deal shrinks to 2 seats (a downgrade) after both invitations went out.
+    await db.update(plansTable).set({ seatLimit: 2 }).where(eq(plansTable.id, planRowId));
+
+    const first = await signUp(firstEmail);
+    cleanupUserIds.push(first.userId);
+    expect((await accept(first.cookie, firstInvitation.id)).status).toBe(200);
+
+    const second = await signUp(secondEmail);
+    cleanupUserIds.push(second.userId);
+    const refused = await accept(second.cookie, secondInvitation.id);
+    const body = (await refused.json()) as { code?: string };
+    expect(refused.status).toBe(403);
+    expect(body.code).toBe("ORGANIZATION_MEMBERSHIP_LIMIT_REACHED");
+
+    // The server-side path is gated by the same hook, not just the HTTP accept route —
+    // asserted by its exact code, so an unrelated failure can't pass for it.
+    await expect(
+      auth.api.addMember({
+        body: { userId: second.userId, role: "member", organizationId: orgId },
+      }),
+    ).rejects.toMatchObject({ body: { code: "ORGANIZATION_MEMBERSHIP_LIMIT_REACHED" } });
+
+    const members = await db
+      .select()
+      .from(memberTable)
+      .where(eq(memberTable.organizationId, orgId));
+    expect(members).toHaveLength(2);
+  }, 30000);
+
+  // Seat-based billing: the plan's seatLimit is the most an org *could* buy, the
+  // subscription's quantity is what it *did* buy. Letting members in up to the plan's
+  // limit while Stripe bills for fewer seats would be a revenue leak.
+  it("caps members at the seats a live subscription paid for, below the plan's limit", async () => {
+    const { orgId } = await newOrg("paid");
+    await giveOrgSeatLimit(orgId, 10);
+    await withOrgScope(orgId, async (tx) => {
+      await ensureBillingRow(tx, orgId);
+      await updateBillingByOrgId(tx, orgId, {
+        providerSubscriptionId: `sub_seats_paid_${Date.now()}`,
+        subscriptionStatus: "active",
+        seatQuantity: 2,
+      });
+    });
+
+    const joiner = await signUp(`org-seats-paid-joiner-${Date.now()}@example.com`);
+    cleanupUserIds.push(joiner.userId);
+    await auth.api.addMember({
+      body: { userId: joiner.userId, role: "member", organizationId: orgId },
+    });
+
+    const extra = await signUp(`org-seats-paid-extra-${Date.now()}@example.com`);
+    cleanupUserIds.push(extra.userId);
+    await expect(
+      auth.api.addMember({ body: { userId: extra.userId, role: "member", organizationId: orgId } }),
+    ).rejects.toMatchObject({ body: { code: "ORGANIZATION_MEMBERSHIP_LIMIT_REACHED" } });
+  }, 30000);
 });

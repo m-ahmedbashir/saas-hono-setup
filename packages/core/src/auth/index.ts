@@ -5,8 +5,14 @@ import { db, withOrgScope, ensureOrganizationProfileRow } from "@repo/db";
 import * as schema from "@repo/db/schema";
 import { accessControl, roles } from "./permissions";
 import { platformAccessControl, platformRoles } from "./platform-permissions";
+import { resolveSeatUsage } from "./membership-limit";
 
 export { statement, roles } from "./permissions";
+export {
+  registerSeatUsageResolver,
+  type SeatUsage,
+  type SeatUsageResolver,
+} from "./membership-limit";
 export { platformStatement, platformRoles, platformAccessControl } from "./platform-permissions";
 // Re-exported for the same reason @repo/db re-exports drizzle-orm operators (see
 // AGENTS.md) — `better-auth` isn't a direct dependency of apps/api, only of this
@@ -40,6 +46,17 @@ export const auth = betterAuth({
     organization({
       ac: accessControl,
       roles,
+      // Seat limits, from apps/api via membership-limit.ts. membershipLimit is the hard
+      // stop — Better Auth checks it on every accepted invitation and every addMember
+      // (verified in the installed crud-invites.mjs/crud-members.mjs), so no path to
+      // joining skips it. invitationLimit caps *pending* invitations at the free seats, so
+      // a full org is told at invite time rather than the invitee being refused at accept.
+      membershipLimit: async (_user, joiningOrganization) =>
+        (await resolveSeatUsage(joiningOrganization.id)).limit,
+      invitationLimit: async ({ organization: invitingOrganization }) => {
+        const { limit, members } = await resolveSeatUsage(invitingOrganization.id);
+        return Math.max(limit - members, 0);
+      },
       // A second instance of this file's one documented DIP exception (importing `db`
       // for the adapter above) — Better Auth's hook API can only be wired here, inside
       // the same betterAuth() config, so the organization_profile row (specifically its

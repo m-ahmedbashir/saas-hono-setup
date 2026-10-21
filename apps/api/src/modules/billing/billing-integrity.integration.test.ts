@@ -74,7 +74,12 @@ function checkoutCompletedPayload(eventId: string, subscriptionId: string, creat
         client_reference_id: orgId,
         customer: `cus_test_${eventId}`,
         subscription: subscriptionId,
-        metadata: { ownerType: "organization", ownerId: orgId, planId: "starter" },
+        metadata: {
+          ownerType: "organization",
+          ownerId: orgId,
+          planId: "starter",
+          seatQuantity: "3",
+        },
       },
     },
   });
@@ -440,7 +445,7 @@ describe("Out-of-order delivery (Fix 3)", () => {
 });
 
 // The billing row's `plan` is what entitlements and seat limits resolve from
-// (entitlement.middleware.ts / seat-limit.middleware.ts), so a subscription that has ended
+// (entitlement.middleware.ts / getOrganizationSeatLimit), so a subscription that has ended
 // must stop granting its paid plan — otherwise canceling keeps paid access forever. Stripe's
 // webhook stays the single writer of that change.
 describe("Ending a subscription", () => {
@@ -456,6 +461,10 @@ describe("Ending a subscription", () => {
       tx.select().from(billingTable).where(eq(billingTable.providerSubscriptionId, subscriptionId)),
     );
     expect(paid?.plan).toBe("starter");
+    // The seats paid for at checkout — what caps membership while the subscription is live
+    // (billing.service.ts's getOrganizationSeatUsage). Carried in checkout metadata, since
+    // Stripe's checkout.session.completed payload doesn't include line-item quantities.
+    expect(paid?.seatQuantity).toBe(3);
 
     // Stamped later than anything the out-of-order test above applied to this same org's
     // row (it goes up to now + 3600) — otherwise the row's lastEventAt guard rightly

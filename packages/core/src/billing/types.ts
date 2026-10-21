@@ -59,6 +59,8 @@ export type BillingEvent = BillingEventEnvelope &
         providerCustomerId: string;
         providerSubscriptionId: string;
         planId: OrganizationPlanId;
+        /** Seats paid for. `null` for a session created before this was recorded. */
+        seatQuantity: number | null;
       }
     | {
         type: "checkout_completed";

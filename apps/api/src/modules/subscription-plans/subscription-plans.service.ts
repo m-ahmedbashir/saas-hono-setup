@@ -81,7 +81,7 @@ export async function getPlanWithSubscriberCount(
 }
 
 /**
- * The one function `entitlement.middleware.ts`/`seat-limit.middleware.ts`/
+ * The one function `entitlement.middleware.ts`/`getOrganizationSeatLimit`/
  * `billing.service.ts` all call directly (in-process, no HTTP hop — see
  * specs/subscription-management-plan.md's "Internal resolution never goes through the
  * HTTP route"). Custom-then-shared resolution — see `getSubscriptionPlanForBilling`'s
@@ -112,7 +112,7 @@ export async function listPlanOptions(
 }
 
 /**
- * What `entitlement.middleware.ts`/`seat-limit.middleware.ts` use for an
+ * What `entitlement.middleware.ts`/`getOrganizationSeatLimit` use for an
  * organization/user with no billing row at all yet — replaces the old hardcoded
  * `"free"`/`"individual_free"` fallback string, per
  * specs/subscription-management-plan.md's Assumptions section: `isDefault` only means
@@ -125,6 +125,19 @@ export async function getDefaultPlanId(ownerType: OwnerType): Promise<string> {
   const row = await getDefaultSharedPlan(db, ownerType);
   if (row) return row.planId;
   return ownerType === "organization" ? "free" : "individual_free";
+}
+
+/**
+ * Which plan a billing row means right now: its own `plan`, or the default plan when the
+ * owner has no billing row yet (never checked out). The one place this rule lives, so
+ * entitlements (entitlement.middleware.ts) and seat limits (billing.service.ts's
+ * getOrganizationSeatUsage) can never disagree about the same owner's plan.
+ */
+export async function currentPlanId(
+  ownerType: OwnerType,
+  billingRow: { plan: string } | null,
+): Promise<string> {
+  return billingRow?.plan ?? getDefaultPlanId(ownerType);
 }
 
 /**

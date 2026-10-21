@@ -47,7 +47,15 @@ export class StripeBillingService implements BillingGateway {
         line_items: [{ price: providerPriceId, quantity }],
         success_url: `${checkoutReturnUrl}?checkout=success`,
         cancel_url: `${checkoutReturnUrl}?checkout=cancelled`,
-        metadata: { ownerType: "organization", ownerId: orgId, planId },
+        // seatQuantity rides along in metadata (signed, echoed back on the webhook) because
+        // checkout.session.completed doesn't include line-item quantities — and the seats
+        // paid for are what caps the org's membership while the subscription is live.
+        metadata: {
+          ownerType: "organization",
+          ownerId: orgId,
+          planId,
+          seatQuantity: String(quantity),
+        },
       },
       idempotencyKey ? { idempotencyKey } : undefined,
     );
@@ -152,7 +160,12 @@ export class StripeBillingService implements BillingGateway {
           planId,
         };
         if (ownerType === "organization") {
-          return { ...shared, ownerType };
+          const seatQuantity = Number(session.metadata?.seatQuantity);
+          return {
+            ...shared,
+            ownerType,
+            seatQuantity: Number.isInteger(seatQuantity) && seatQuantity > 0 ? seatQuantity : null,
+          };
         }
         if (ownerType === "individual") {
           return { ...shared, ownerType };

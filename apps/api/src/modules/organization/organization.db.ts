@@ -8,7 +8,7 @@ import {
   type AnyExecutor,
 } from "@repo/db";
 
-/** Current members of an organization — what both seat-limit enforcement and checkout's seat-count check measure against. `member` isn't RLS-enabled (Better-Auth-generated), hence `AnyExecutor`. */
+/** Current members of an organization — what checkout's minimum seat count is measured against. `member` isn't RLS-enabled (Better-Auth-generated), hence `AnyExecutor`. */
 export async function countOrganizationMembers(
   tx: AnyExecutor,
   organizationId: string,

@@ -7,6 +7,7 @@ import {
 } from "@repo/core";
 import {
   getPlanForBilling,
+  currentPlanId,
   listPlanOptions,
   type PlanOptionRow,
 } from "../subscription-plans/subscription-plans.service";
@@ -55,8 +56,8 @@ function assertNoLiveSubscription(status: SubscriptionStatus | null, message: st
 }
 
 // Seat-based billing: paying for fewer seats than the org already has members under-bills
-// it, and more than the plan's member limit pays for seats enforceSeatLimit will never let
-// it fill. apps/portal's form checks the same bounds for UX; this is the authority.
+// it, and more than the plan's member limit pays for seats getOrganizationSeatUsage (below)
+// will never let it fill. apps/portal's form checks the same bounds for UX; this is the authority.
 function assertSeatQuantity(quantity: number, memberCount: number, seatLimit: number | null) {
   if (quantity < memberCount) {
     throw new AppError(
@@ -117,6 +118,38 @@ export async function createIndividualCheckout(
   );
 }
 
+/**
+ * How many members an organization may have, and has — what Better Auth asks before anyone
+ * is invited or joins (its invitationLimit/membershipLimit hooks, registered in
+ * lib/auth-wiring.ts).
+ *
+ * The limit is the plan's `seatLimit` (resolved like entitlements: `currentPlanId`, then the
+ * custom-then-shared catalog lookup; `null` = no cap), but while a subscription is live it's
+ * further capped at the seats that subscription actually pays for — the plan's limit is the
+ * most an org *could* buy, `seatQuantity` is what it *did* buy, and letting members in past
+ * it while Stripe bills for fewer would leak revenue. A plan that can't be resolved at all
+ * fails closed (no new members), same stance as fallbackEntitlements.
+ */
+export async function getOrganizationSeatUsage(
+  organizationId: string,
+): Promise<{ limit: number; members: number }> {
+  const { row, members } = await withOrgScope(organizationId, async (tx) => ({
+    row: await getBillingByOrgId(tx, organizationId),
+    members: await countOrganizationMembers(tx, organizationId),
+  }));
+  const plan = await getPlanForBilling(
+    "organization",
+    await currentPlanId("organization", row),
+    organizationId,
+  );
+  if (!plan) return { limit: 0, members };
+
+  const planLimit = plan.seatLimit ?? Number.POSITIVE_INFINITY;
+  const paidSeats =
+    isLiveSubscription(statusOf(row)) && row?.seatQuantity != null ? row.seatQuantity : null;
+  return { limit: paidSeats === null ? planLimit : Math.min(planLimit, paidSeats), members };
+}
+
 // subscription_status is plain text in packages/db (which can't import @repo/core's
 // union), but only ever written from mapStripeStatus's output — this is the one place
 // it's narrowed back, rather than a cast at every read.
@@ -135,7 +168,7 @@ export interface OrganizationBillingView {
 // `providerSubscriptionId` (internal Stripe ids with no reason to leave the backend).
 // `ensureBillingRow`, not `getBillingByOrgId` — an org with no billing row yet (never
 // checked out) still gets a real response (defaults to the free plan), not a 404, same
-// as how entitlement/seat-limit middleware already treat a missing row.
+// as how currentPlanId treats a missing row for entitlements and seat limits.
 export async function getOrganizationBillingView(
   organizationId: string,
 ): Promise<OrganizationBillingView> {

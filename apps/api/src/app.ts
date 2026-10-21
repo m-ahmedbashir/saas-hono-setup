@@ -1,3 +1,4 @@
+import "./lib/auth-wiring";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
