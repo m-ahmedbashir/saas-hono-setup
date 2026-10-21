@@ -22,7 +22,8 @@
       "PowerShell(pnpm --filter @repo/api test -- src/modules/auth/organization-permissions.integration.test.ts 2>&1 | Select-String -Pattern \"^\\\\s+\\(×|✓\\)|AssertionError|Tests \" | ForEach-Object { $_.Line })",
       "PowerShell(pnpm --filter @repo/api test -- src/modules/billing/billing-integrity.integration.test.ts -t \"Ending a subscription\" 2>&1 | Select-String -Pattern \"^\\\\s+\\(×|✓\\)|AssertionError|Tests \" | ForEach-Object { $_.Line })",
       "PowerShell(pnpm --filter @repo/api test -- src/modules/auth/organization-permissions.integration.test.ts src/modules/billing/billing-integrity.integration.test.ts src/middleware --no-file-parallelism 2>&1 | Select-String -Pattern \"^\\\\s+×|AssertionError|Tests |Test Files\" | ForEach-Object { $_.Line })",
-      "Bash(pnpm --filter @repo/portal exec vitest run src/features/team)"
+      "Bash(pnpm --filter @repo/portal exec vitest run src/features/team)",
+      "Bash(pnpm --filter @repo/portal exec vitest run src/lib/safe-redirect.test.ts)"
     ]
   }
 }
