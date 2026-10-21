@@ -7,6 +7,8 @@ import {
   createIndividualCheckout,
   getOrganizationBillingView,
   getIndividualBillingView,
+  getOrganizationPlanOptions,
+  getIndividualPlanOptions,
   cancelOrganizationSubscription,
   cancelIndividualSubscription,
 } from "./billing.service";
@@ -59,6 +61,21 @@ export async function getIndividualBillingHandler(c: Context) {
   const view = await getIndividualBillingView(userContext.user.id);
 
   return success(c, view);
+}
+
+export async function getOrganizationPlansHandler(c: Context) {
+  const userContext = requireOrgContext(c.get("userContext"));
+  const options = await getOrganizationPlanOptions(userContext.organizationId);
+
+  return success(c, options);
+}
+
+// Shared catalog only — never the active org's custom plans, since those are an org
+// deal, not something an individual's own billing can resolve to.
+export async function getIndividualPlansHandler(c: Context) {
+  const options = await getIndividualPlanOptions();
+
+  return success(c, options);
 }
 
 export async function cancelOrganizationBillingHandler(c: Context) {

@@ -1,5 +1,7 @@
 # MindLeague Core Architecture & Agents Manual
 
+> **Historical document.** This is the original blueprint from before the repo became a product-agnostic SaaS foundation — the `algorithms/`, `ai/` and `student-progress` pieces it describes were removed (see PROGRESS.md). For the current architecture, read [ARCHITECTURE.md](./ARCHITECTURE.md).
+
 This document provides the complete, production-grade technical blueprint for the MindLeague workspace. Our platform is structured as a type-safe **Monorepo** orchestrating a high-performance **Hono API backend**, a **Drizzle ORM** database layer, and a decoupled **AI Agent Engine** with **ephemeral prompt caching**.
 
 ---

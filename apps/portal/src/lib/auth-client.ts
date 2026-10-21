@@ -1,5 +1,9 @@
 import { createAuthClient } from "better-auth/react";
 import { organizationClient } from "better-auth/client/plugins";
+// Subpath import, never "@repo/core" or "@repo/core/auth" — those construct a live
+// betterAuth() instance with a real Postgres connection at module load (AGENTS.md's
+// apps/admin section). This file is side-effect-free.
+import { accessControl, roles } from "@repo/core/auth/permissions";
 
 // Points straight at apps/api — no Next.js route-handler proxy in between. Browser
 // requests carry the session cookie automatically (`credentials: "include"` is the
@@ -10,9 +14,13 @@ import { organizationClient } from "better-auth/client/plugins";
 //
 // No adminClient/platformRoles here — this app's audience is never platform staff (see
 // specs/customer-portal-plan.md's Architecture section). That's apps/admin's concern.
+//
+// The same ac/roles the server's organization plugin uses, so permission checks like
+// `organization.hasPermission({ permissions: { billing: ["manage"] } })` type-check
+// against this repo's real statement. Typing only — enforcement stays server-side.
 export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
-  plugins: [organizationClient()],
+  plugins: [organizationClient({ ac: accessControl, roles })],
 });
 
 export const { useSession, signIn, signOut } = authClient;

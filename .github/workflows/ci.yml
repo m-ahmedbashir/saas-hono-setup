@@ -89,10 +89,10 @@ jobs:
           DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test
           BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }}
           BETTER_AUTH_URL=http://localhost:8787
-          ALLOWED_ORIGINS=http://localhost:3000
+          ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3002
           PORT=8787
           STRIPE_WEBHOOK_SECRET=whsec_test_secret_for_ci_only
-          BILLING_CHECKOUT_RETURN_URL=http://localhost:3000/billing
+          BILLING_CHECKOUT_RETURN_URL=http://localhost:3002/billing
           EOF
 
       - name: Create restricted app_user role

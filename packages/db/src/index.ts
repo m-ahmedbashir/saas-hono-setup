@@ -50,6 +50,7 @@ export {
   and,
   or,
   count,
+  asc,
   desc,
   inArray,
   notInArray,

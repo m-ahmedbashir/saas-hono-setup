@@ -14,7 +14,11 @@
       "Bash(pnpm --filter @repo/api typecheck)",
       "Bash(pnpm typecheck *)",
       "Bash(npx cross-env *)",
-      "Bash(pnpm lint *)"
+      "Bash(pnpm lint *)",
+      "PowerShell(pnpm --filter @repo/api test -- src/modules/billing/billing-self-service.integration.test.ts 2>&1 | Select-String -Pattern \"Error|error|FAIL|❯ src\" -Context 0,3 | Select-Object -First 12 | ForEach-Object { $_.ToString\\(\\) })",
+      "PowerShell(pnpm --filter @repo/api test -- src/modules/billing/billing-integrity.integration.test.ts 2>&1 | Select-String -Pattern \"^\\\\s+×|Tests |Test Files\" | ForEach-Object { $_.Line })",
+      "PowerShell(pnpm db:migrate 2>&1)",
+      "Bash(pnpm --filter @repo/portal test)"
     ]
   }
 }

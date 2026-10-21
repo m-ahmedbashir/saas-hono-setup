@@ -14,6 +14,8 @@ import {
   getSubscriptionPlanForBilling,
   getDefaultSharedPlan,
   listOtherActiveSharedPlans,
+  listPlansForScope,
+  applyCustomPlanPrecedence,
   insertSubscriptionPlan,
   updateSubscriptionPlan,
   clearOtherDefaults,
@@ -91,6 +93,22 @@ export async function getPlanForBilling(
   organizationId: string | null,
 ): Promise<SubscriptionPlanRow | null> {
   return getSubscriptionPlanForBilling(db, ownerType, planId, organizationId);
+}
+
+export type PlanOptionRow = Awaited<ReturnType<typeof listPlansForScope>>[number];
+
+/**
+ * The plans a customer in this scope can choose from: exactly the rows checkout would
+ * resolve each slug to (the same `applyCustomPlanPrecedence` as `getPlanForBilling`),
+ * then only the active ones. Precedence first, filter second — the other order would let
+ * a retired custom deal stop shadowing the shared plan, offering a plan checkout refuses.
+ */
+export async function listPlanOptions(
+  ownerType: OwnerType,
+  organizationId: string | null,
+): Promise<PlanOptionRow[]> {
+  const rows = await listPlansForScope(db, ownerType, organizationId);
+  return applyCustomPlanPrecedence(rows).filter((r) => r.isActive);
 }
 
 /**

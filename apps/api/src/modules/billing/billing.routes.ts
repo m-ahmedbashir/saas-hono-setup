@@ -10,6 +10,8 @@ import {
   individualCheckoutHandler,
   getOrganizationBillingHandler,
   getIndividualBillingHandler,
+  getOrganizationPlansHandler,
+  getIndividualPlansHandler,
   cancelOrganizationBillingHandler,
   cancelIndividualBillingHandler,
   webhookRequestHandler,
@@ -59,6 +61,11 @@ export const billingRoutes = new Hono()
   .get("/organization", injectUserContext, getOrganizationBillingHandler)
   // Ownership-based, same reasoning as /individual-checkout above.
   .get("/individual", injectUserContext, getIndividualBillingHandler)
+  // Customer-facing, read-only projection of the plan catalog (/subscription-plans is
+  // platform-staff-only). Viewable by any active-org member, same reasoning as
+  // GET /organization above — only *buying* one is billing:manage-gated.
+  .get("/organization-plans", injectUserContext, getOrganizationPlansHandler)
+  .get("/individual-plans", injectUserContext, getIndividualPlansHandler)
   // Owner/admin only, same permission as organization-checkout — canceling the org's
   // subscription is exactly as sensitive as starting one.
   .post(

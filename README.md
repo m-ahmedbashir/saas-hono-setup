@@ -96,7 +96,7 @@ See `.env.example` for the full list with comments. Summary:
 | `STRIPE_WEBHOOK_SECRET`                                     | Signing secret for `/billing/webhook`, from the Stripe CLI or dashboard                                                                                                  |
 | `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_GROWTH`              | Stripe Price IDs backing the organization (seat-based) paid tiers                                                                                                        |
 | `STRIPE_PRICE_INDIVIDUAL_PRO`                               | Stripe Price ID backing the individual (B2C) paid tier                                                                                                                   |
-| `BILLING_CHECKOUT_RETURN_URL`                               | Where Stripe Checkout redirects back to after a session completes/cancels                                                                                                |
+| `BILLING_CHECKOUT_RETURN_URL`                               | Where Stripe Checkout redirects back to after a session completes/cancels — `apps/portal`'s `/billing` page (default `http://localhost:3002/billing`)                    |
 
 `.env.development` / `.env.test` are gitignored — they're for your local machine only. `NODE_ENV` itself is **not** set in any env file; each `apps/api` script sets it directly (`dev` → `development`, `start` → `production`, `test` → `test`) via `cross-env`, so it's always correct regardless of which command runs. Real production secrets should come from your hosting platform's env var injection at deploy time, never from a committed file.
 
@@ -191,7 +191,7 @@ If a new table is involved, add it to `packages/db/src/schema.ts`, then `pnpm db
 
 ## Contributing
 
-[`AGENTS.md`](./AGENTS.md) is the full set of engineering conventions for this repo — architecture rules, the DDD/SOLID reasoning behind the package split, the auth model in detail, and the response contract. It was written for AI coding agents working in this repo, but every rule in it applies equally to a human contributor. Read it before opening a PR. [`PROGRESS.md`](./PROGRESS.md) tracks what's actually implemented and verified at any given time, separate from the standing rules.
+Start with [`ARCHITECTURE.md`](./ARCHITECTURE.md) for a bird's-eye view of how the apps and packages fit together, with diagrams of the main flows. [`AGENTS.md`](./AGENTS.md) is the full set of engineering conventions for this repo — architecture rules, the DDD/SOLID reasoning behind the package split, the auth model in detail, and the response contract. It was written for AI coding agents working in this repo, but every rule in it applies equally to a human contributor. Read it before opening a PR. [`PROGRESS.md`](./PROGRESS.md) tracks what's actually implemented and verified at any given time, separate from the standing rules.
 
 ## Changelog
 

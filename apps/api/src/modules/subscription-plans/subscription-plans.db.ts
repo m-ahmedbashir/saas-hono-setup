@@ -1,4 +1,4 @@
-import { subscriptionPlans, eq, ne, and, isNull, desc, type AnyExecutor } from "@repo/db";
+import { subscriptionPlans, eq, ne, and, or, isNull, asc, desc, type AnyExecutor } from "@repo/db";
 
 // `subscriptionPlans` isn't RLS-enabled (global config, not owner-scoped data — see
 // schema.ts's comment on the table), so every function here takes `AnyExecutor`
@@ -32,15 +32,40 @@ export async function getSubscriptionPlanById(tx: AnyExecutor, id: string) {
   return row ?? null;
 }
 
+// Which plans a scope can see at all: every shared plan, plus — for an organization —
+// that one org's own custom plans. Never another org's.
+function visibleToScope(organizationId: string | null) {
+  return organizationId
+    ? or(
+        isNull(subscriptionPlans.organizationId),
+        eq(subscriptionPlans.organizationId, organizationId),
+      )
+    : isNull(subscriptionPlans.organizationId);
+}
+
 /**
- * Custom-then-shared resolution: an organization's own negotiated plan
- * (`organizationId` set) takes priority over a shared plan (`organizationId IS NULL`)
- * using the same `planId` slug — see specs/subscription-management-plan.md's
- * custom-plan design. Individual lookups always pass `organizationId: null` and go
- * straight to the shared branch (individuals never have a custom org-scoped plan).
- * This is what every billing-row plan lookup (entitlements, seat limit, checkout) goes
- * through — a billing row's `plan` string alone can't tell you which subscription_plans
- * row it means without also knowing the owning organization.
+ * The custom-then-shared precedence rule, defined once for every caller — the single
+ * plan lookup behind entitlements/seat limits/checkout (`getSubscriptionPlanForBilling`)
+ * and the customer-facing plan list (`listPlanOptions`) both go through it, so they can
+ * never disagree about which row a slug means for an org. An org's custom plan replaces
+ * the shared plan with the same `planId` **whether or not the custom one is active**: a
+ * retired deal must keep resolving for the org's existing subscribers (their entitlements
+ * don't silently switch to the shared plan's), and so the shared plan isn't offered to
+ * that org either — checkout would resolve the slug to the retired deal and refuse it.
+ */
+export function applyCustomPlanPrecedence<
+  T extends { planId: string; organizationId: string | null },
+>(rows: T[]): T[] {
+  const customSlugs = new Set(rows.filter((r) => r.organizationId !== null).map((r) => r.planId));
+  return rows.filter((r) => r.organizationId !== null || !customSlugs.has(r.planId));
+}
+
+/**
+ * Which `subscription_plans` row a billing row's plan string means for this owner — what
+ * every billing-row plan lookup (entitlements, seat limit, checkout) goes through. A
+ * billing row's `plan` alone can't answer this without the owning organization, since an
+ * org can have its own custom plan reusing a shared slug (specs/subscription-management-
+ * plan.md's custom-plan design). Individuals always pass `organizationId: null`.
  */
 export async function getSubscriptionPlanForBilling(
   tx: AnyExecutor,
@@ -48,31 +73,42 @@ export async function getSubscriptionPlanForBilling(
   planId: string,
   organizationId: string | null,
 ) {
-  if (organizationId) {
-    const [custom] = await tx
-      .select()
-      .from(subscriptionPlans)
-      .where(
-        and(
-          eq(subscriptionPlans.ownerType, ownerType),
-          eq(subscriptionPlans.planId, planId),
-          eq(subscriptionPlans.organizationId, organizationId),
-        ),
-      );
-    if (custom) return custom;
-  }
-
-  const [shared] = await tx
+  const candidates = await tx
     .select()
     .from(subscriptionPlans)
     .where(
       and(
         eq(subscriptionPlans.ownerType, ownerType),
         eq(subscriptionPlans.planId, planId),
-        isNull(subscriptionPlans.organizationId),
+        visibleToScope(organizationId),
       ),
     );
-  return shared ?? null;
+  return applyCustomPlanPrecedence(candidates)[0] ?? null;
+}
+
+/**
+ * Every plan visible to this scope (active or not — precedence has to see retired custom
+ * plans too, see `applyCustomPlanPrecedence`), with only the fields the customer-facing
+ * plan list needs. Oldest first, so the seeded free tier naturally leads the list.
+ */
+export async function listPlansForScope(
+  tx: AnyExecutor,
+  ownerType: OwnerType,
+  organizationId: string | null,
+) {
+  return tx
+    .select({
+      planId: subscriptionPlans.planId,
+      organizationId: subscriptionPlans.organizationId,
+      name: subscriptionPlans.name,
+      description: subscriptionPlans.description,
+      seatLimit: subscriptionPlans.seatLimit,
+      providerPriceId: subscriptionPlans.providerPriceId,
+      isActive: subscriptionPlans.isActive,
+    })
+    .from(subscriptionPlans)
+    .where(and(eq(subscriptionPlans.ownerType, ownerType), visibleToScope(organizationId)))
+    .orderBy(asc(subscriptionPlans.createdAt));
 }
 
 /** The current default shared plan for an `ownerType`, or `null` if none is flagged yet (shouldn't happen once seeded, but not assumed). */

@@ -7,6 +7,8 @@ import {
   user as userTable,
   organizationBilling as orgBillingTable,
   individualBilling as userBillingTable,
+  subscriptionPlans as plansTable,
+  inArray,
   withOrgScope,
   withUserScope,
   withSystemScope,
@@ -47,6 +49,33 @@ let outsiderOwnerCookie: string;
 let outsiderOrgId: string;
 let outsiderSoloId: string;
 let outsiderSoloCookie: string;
+// subscription_plans rows this file inserts directly (not RLS-enabled, global config) —
+// deleted unconditionally in afterAll, same as every other row created here.
+const cleanupPlanIds: string[] = [];
+
+async function insertPlan(values: {
+  ownerType: "organization" | "individual";
+  planId: string;
+  name: string;
+  organizationId?: string;
+  isActive?: boolean;
+  providerPriceId?: string;
+  seatLimit?: number;
+}) {
+  const id = crypto.randomUUID();
+  cleanupPlanIds.push(id);
+  await db.insert(plansTable).values({
+    id,
+    ownerType: values.ownerType,
+    planId: values.planId,
+    organizationId: values.organizationId ?? null,
+    name: values.name,
+    providerPriceId: values.providerPriceId ?? null,
+    seatLimit: values.seatLimit ?? null,
+    isActive: values.isActive ?? true,
+    isDefault: false,
+  });
+}
 
 async function signUp(email: string) {
   const res = await fetch(`http://localhost:${PORT}/api/auth/sign-up/email`, {
@@ -116,6 +145,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (cleanupPlanIds.length > 0) {
+    await db.delete(plansTable).where(inArray(plansTable.id, cleanupPlanIds));
+  }
   await withSystemScope(async (tx) => {
     await tx.delete(orgBillingTable).where(eq(orgBillingTable.organizationId, orgId));
     await tx.delete(orgBillingTable).where(eq(orgBillingTable.organizationId, outsiderOrgId));
@@ -232,6 +264,235 @@ describe("GET /billing/individual", () => {
   });
 });
 
+// apps/portal calls checkout cross-origin with an Idempotency-Key header (a non-simple
+// header), so the browser sends a CORS preflight first — if the API doesn't list the header
+// in Access-Control-Allow-Headers, the browser blocks the real request before it's sent.
+describe("CORS preflight for checkout", () => {
+  it("allows the Idempotency-Key header from an allowed origin", async () => {
+    const res = await fetch(`http://localhost:${PORT}/billing/individual-checkout`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: ORIGIN,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type,idempotency-key",
+      },
+    });
+    const allowed = (res.headers.get("access-control-allow-headers") ?? "").toLowerCase();
+    expect(allowed).toContain("idempotency-key");
+  });
+});
+
+// The plan catalog's own routes (/subscription-plans) are platform-staff-only, so a
+// customer choosing what to upgrade to needs a separate, self-service, read-only view of
+// it. Seeded directly rather than via the admin API — this file is about the customer
+// view, not plan creation (subscription-plans.integration.test.ts covers that).
+describe("plan options", () => {
+  const ts = Date.now();
+  const sharedOrgSlug = `self-service-shared-${ts}`;
+  const customOrgSlug = `self-service-custom-${ts}`;
+  const outsiderCustomSlug = `self-service-outsider-${ts}`;
+  const retiredOrgSlug = `self-service-retired-${ts}`;
+  const sharedIndividualSlug = `self-service-individual-${ts}`;
+  const shadowedSlug = `self-service-shadowed-${ts}`;
+
+  beforeAll(async () => {
+    // A retired custom deal still shadows the shared plan of the same slug for orgId —
+    // checkout resolves orgId's slug to the custom row regardless of isActive (so existing
+    // subscribers keep their entitlements), so offering the shared one here would show
+    // orgId a plan checkout always rejects.
+    await insertPlan({
+      ownerType: "organization",
+      planId: shadowedSlug,
+      name: "Shadowed Shared",
+      providerPriceId: "price_shadowed_fake",
+    });
+    await insertPlan({
+      ownerType: "organization",
+      planId: shadowedSlug,
+      name: "Retired Deal",
+      organizationId: orgId,
+      isActive: false,
+      providerPriceId: "price_retired_fake",
+    });
+    await insertPlan({
+      ownerType: "organization",
+      planId: sharedOrgSlug,
+      name: "Shared Version",
+      providerPriceId: "price_shared_fake",
+    });
+    // Same slug as the shared plan above, scoped to orgId — must replace it in orgId's
+    // view only (custom-then-shared, same resolution getSubscriptionPlanForBilling uses).
+    await insertPlan({
+      ownerType: "organization",
+      planId: sharedOrgSlug,
+      name: "Negotiated Version",
+      organizationId: orgId,
+      providerPriceId: "price_custom_fake",
+    });
+    await insertPlan({
+      ownerType: "organization",
+      planId: customOrgSlug,
+      name: "Org Only",
+      organizationId: orgId,
+    });
+    await insertPlan({
+      ownerType: "organization",
+      planId: outsiderCustomSlug,
+      name: "Outsider Only",
+      organizationId: outsiderOrgId,
+    });
+    await insertPlan({
+      ownerType: "organization",
+      planId: retiredOrgSlug,
+      name: "Retired",
+      isActive: false,
+    });
+    await insertPlan({
+      ownerType: "individual",
+      planId: sharedIndividualSlug,
+      name: "Individual Shared",
+      providerPriceId: "price_individual_fake",
+    });
+  });
+
+  type PlanOption = {
+    planId: string;
+    name: string;
+    description: string | null;
+    seatLimit?: number | null;
+    isPurchasable: boolean;
+  };
+
+  describe("GET /billing/organization-plans", () => {
+    it("rejects an unauthenticated request", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/organization-plans`, {
+        headers: { Origin: ORIGIN },
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it("rejects a request with no active organization", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/organization-plans`, {
+        headers: { Origin: ORIGIN, Cookie: soloCookie },
+      });
+      expect(res.status).toBe(422);
+    });
+
+    it("lists active organization plans, including this org's custom ones, to any member", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/organization-plans`, {
+        headers: { Origin: ORIGIN, Cookie: memberCookie },
+      });
+      const body = (await res.json()) as { success: boolean; data: { plans: PlanOption[] } };
+      expect(res.status).toBe(200);
+      const slugs = body.data.plans.map((p) => p.planId);
+
+      expect(slugs).toContain("free");
+      expect(slugs).toContain(customOrgSlug);
+      expect(slugs).not.toContain(retiredOrgSlug);
+      expect(slugs).not.toContain(sharedIndividualSlug);
+      expect(slugs).not.toContain("individual_free");
+    });
+
+    it("replaces a shared plan with this org's custom plan of the same slug, listing it once", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/organization-plans`, {
+        headers: { Origin: ORIGIN, Cookie: memberCookie },
+      });
+      const body = (await res.json()) as { data: { plans: PlanOption[] } };
+      const matches = body.data.plans.filter((p) => p.planId === sharedOrgSlug);
+      expect(matches).toHaveLength(1);
+      expect(matches[0]!.name).toBe("Negotiated Version");
+      expect(matches[0]!.isPurchasable).toBe(true);
+    });
+
+    it("marks a plan with no price as not purchasable, and never exposes internal Stripe/admin fields", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/organization-plans`, {
+        headers: { Origin: ORIGIN, Cookie: memberCookie },
+      });
+      const body = (await res.json()) as { data: { plans: Record<string, unknown>[] } };
+      const free = body.data.plans.find((p) => p.planId === "free");
+      expect(free?.isPurchasable).toBe(false);
+      for (const plan of body.data.plans) {
+        expect(plan).not.toHaveProperty("providerPriceId");
+        expect(plan).not.toHaveProperty("organizationId");
+        expect(plan).not.toHaveProperty("isActive");
+      }
+    });
+
+    it("hides a shared plan shadowed by this org's retired custom plan, matching what checkout would resolve", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/organization-plans`, {
+        headers: { Origin: ORIGIN, Cookie: memberCookie },
+      });
+      const body = (await res.json()) as { data: { plans: PlanOption[] } };
+      expect(body.data.plans.map((p) => p.planId)).not.toContain(shadowedSlug);
+
+      // Proven against checkout itself, not just asserted: checkout rejects the slug for orgId.
+      const checkout = await fetch(`http://localhost:${PORT}/billing/organization-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: ownerCookie },
+        body: JSON.stringify({ planId: shadowedSlug, quantity: 2 }),
+      });
+      const checkoutBody = (await checkout.json()) as { error?: { message: string } };
+      expect(checkout.status).toBe(422);
+      expect(checkoutBody.error?.message).toMatch(/no longer available/i);
+    });
+
+    it("still offers that shared plan to an org without its own deal", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/organization-plans`, {
+        headers: { Origin: ORIGIN, Cookie: outsiderOwnerCookie },
+      });
+      const body = (await res.json()) as { data: { plans: PlanOption[] } };
+      expect(body.data.plans.map((p) => p.planId)).toContain(shadowedSlug);
+    });
+
+    it("never shows another organization's custom plans, even to a legitimate owner of a different org", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/organization-plans`, {
+        headers: { Origin: ORIGIN, Cookie: outsiderOwnerCookie },
+      });
+      const body = (await res.json()) as { data: { plans: PlanOption[] } };
+      const slugs = body.data.plans.map((p) => p.planId);
+      expect(slugs).toContain(outsiderCustomSlug);
+      expect(slugs).not.toContain(customOrgSlug);
+      expect(body.data.plans.find((p) => p.planId === sharedOrgSlug)?.name).toBe("Shared Version");
+    });
+  });
+
+  describe("GET /billing/individual-plans", () => {
+    it("rejects an unauthenticated request", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/individual-plans`, {
+        headers: { Origin: ORIGIN },
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it("lists only active shared individual plans, with no seat concept", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/individual-plans`, {
+        headers: { Origin: ORIGIN, Cookie: soloCookie },
+      });
+      const body = (await res.json()) as { success: boolean; data: { plans: PlanOption[] } };
+      expect(res.status).toBe(200);
+      const slugs = body.data.plans.map((p) => p.planId);
+
+      expect(slugs).toContain("individual_free");
+      expect(slugs).toContain(sharedIndividualSlug);
+      expect(slugs).not.toContain("free");
+      expect(slugs).not.toContain(customOrgSlug);
+      for (const plan of body.data.plans) {
+        expect(plan).not.toHaveProperty("seatLimit");
+        expect(plan).not.toHaveProperty("providerPriceId");
+      }
+    });
+
+    it("works for a B2B2C session too, still never including the active org's custom plans", async () => {
+      const res = await fetch(`http://localhost:${PORT}/billing/individual-plans`, {
+        headers: { Origin: ORIGIN, Cookie: ownerCookie },
+      });
+      const body = (await res.json()) as { data: { plans: PlanOption[] } };
+      expect(res.status).toBe(200);
+      expect(body.data.plans.map((p) => p.planId)).not.toContain(customOrgSlug);
+    });
+  });
+});
+
 describe("POST /billing/organization-cancel", () => {
   it("rejects an unauthenticated request", async () => {
     const res = await fetch(`http://localhost:${PORT}/billing/organization-cancel`, {
@@ -268,7 +529,10 @@ describe("POST /billing/organization-cancel", () => {
     // the route didn't take the 422 short-circuit above, which is the part actually under
     // this route's own control.
     await withOrgScope(orgId, (tx) =>
-      updateBillingByOrgId(tx, orgId, { providerSubscriptionId: `sub_fake_${Date.now()}` }),
+      updateBillingByOrgId(tx, orgId, {
+        providerSubscriptionId: `sub_fake_${Date.now()}`,
+        subscriptionStatus: "active",
+      }),
     );
 
     const res = await fetch(`http://localhost:${PORT}/billing/organization-cancel`, {
@@ -278,6 +542,25 @@ describe("POST /billing/organization-cancel", () => {
     const body = (await res.json()) as { success: boolean; error?: { code: string } };
     expect(res.status).not.toBe(200);
     expect(body.error?.code).not.toBe("VALIDATION_ERROR");
+  });
+
+  // A subscription Stripe already ended still has its id on the row (kept for late events),
+  // so the id alone can't mean "something to cancel" — calling Stripe again would only fail.
+  it("rejects canceling a subscription that has already ended", async () => {
+    await withOrgScope(orgId, (tx) =>
+      updateBillingByOrgId(tx, orgId, {
+        providerSubscriptionId: `sub_ended_${Date.now()}`,
+        subscriptionStatus: "canceled",
+      }),
+    );
+
+    const res = await fetch(`http://localhost:${PORT}/billing/organization-cancel`, {
+      method: "POST",
+      headers: { Origin: ORIGIN, Cookie: ownerCookie },
+    });
+    const body = (await res.json()) as { error?: { code: string } };
+    expect(res.status).toBe(422);
+    expect(body.error?.code).toBe("VALIDATION_ERROR");
   });
 
   // Same isolation guarantee as the GET route's test, for the mutating side: cancel only
@@ -331,7 +614,10 @@ describe("POST /billing/individual-cancel", () => {
 
   it("routes past the no-subscription check once a subscription id exists, attempting a real cancellation", async () => {
     await withUserScope(soloId, (tx) =>
-      updateUserBillingByUserId(tx, soloId, { providerSubscriptionId: `sub_fake_${Date.now()}` }),
+      updateUserBillingByUserId(tx, soloId, {
+        providerSubscriptionId: `sub_fake_${Date.now()}`,
+        subscriptionStatus: "active",
+      }),
     );
 
     const res = await fetch(`http://localhost:${PORT}/billing/individual-cancel`, {
@@ -341,6 +627,23 @@ describe("POST /billing/individual-cancel", () => {
     const body = (await res.json()) as { success: boolean; error?: { code: string } };
     expect(res.status).not.toBe(200);
     expect(body.error?.code).not.toBe("VALIDATION_ERROR");
+  });
+
+  it("rejects canceling a subscription that has already ended", async () => {
+    await withUserScope(soloId, (tx) =>
+      updateUserBillingByUserId(tx, soloId, {
+        providerSubscriptionId: `sub_ended_${Date.now()}`,
+        subscriptionStatus: "canceled",
+      }),
+    );
+
+    const res = await fetch(`http://localhost:${PORT}/billing/individual-cancel`, {
+      method: "POST",
+      headers: { Origin: ORIGIN, Cookie: soloCookie },
+    });
+    const body = (await res.json()) as { error?: { code: string } };
+    expect(res.status).toBe(422);
+    expect(body.error?.code).toBe("VALIDATION_ERROR");
   });
 
   // Mirrors the organization cancel isolation test above — proves a different account's
@@ -364,5 +667,118 @@ describe("POST /billing/individual-cancel", () => {
       tx.select().from(userBillingTable).where(eq(userBillingTable.userId, soloId)),
     );
     expect(soloRow?.providerSubscriptionId).toBe(soloSubscriptionId);
+  });
+});
+
+// Checkout's own guards, enforced server-side so a client that skips the portal's UI can't
+// get around them. Each test sets the billing state it needs (no dependence on order).
+// Plans carry a fake price: every case here is rejected (or proven to pass the guards)
+// before any Stripe call, so nothing depends on STRIPE_SECRET_KEY.
+describe("checkout guards", () => {
+  const ts = Date.now();
+  const seatedSlug = `self-service-seated-${ts}`;
+  const individualPaidSlug = `self-service-individual-paid-${ts}`;
+
+  beforeAll(async () => {
+    await insertPlan({
+      ownerType: "organization",
+      planId: seatedSlug,
+      name: "Seated",
+      providerPriceId: "price_seated_fake",
+      seatLimit: 5,
+    });
+    await insertPlan({
+      ownerType: "individual",
+      planId: individualPaidSlug,
+      name: "Individual Paid",
+      providerPriceId: "price_individual_paid_fake",
+    });
+  });
+
+  async function orgCheckout(quantity: number) {
+    const res = await fetch(`http://localhost:${PORT}/billing/organization-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: ownerCookie },
+      body: JSON.stringify({ planId: seatedSlug, quantity }),
+    });
+    return { status: res.status, body: (await res.json()) as { error?: { message: string } } };
+  }
+
+  async function setOrgSubscription(status: "active" | "past_due" | "canceled") {
+    await withOrgScope(orgId, async (tx) => {
+      await ensureBillingRow(tx, orgId);
+      await updateBillingByOrgId(tx, orgId, {
+        providerSubscriptionId: `sub_guard_${status}_${Date.now()}`,
+        subscriptionStatus: status,
+      });
+    });
+  }
+
+  // A second checkout would create a second, separately billed Stripe subscription, and
+  // its webhook would overwrite providerSubscriptionId — orphaning the first one from cancel.
+  it("rejects an organization checkout while the org already has a live subscription", async () => {
+    await setOrgSubscription("active");
+    const { status, body } = await orgCheckout(2);
+    expect(status).toBe(422);
+    expect(body.error?.message).toMatch(/already has an active subscription/i);
+  });
+
+  it("treats a past_due subscription as still live", async () => {
+    await setOrgSubscription("past_due");
+    const { status } = await orgCheckout(2);
+    expect(status).toBe(422);
+  });
+
+  it("rejects fewer seats than the organization has members", async () => {
+    await setOrgSubscription("canceled");
+    // orgId has two members (owner + member).
+    const { status, body } = await orgCheckout(1);
+    expect(status).toBe(422);
+    expect(body.error?.message).toMatch(/at least 2 seats/i);
+  });
+
+  it("rejects more seats than the plan allows", async () => {
+    await setOrgSubscription("canceled");
+    const { status, body } = await orgCheckout(6);
+    expect(status).toBe(422);
+    expect(body.error?.message).toMatch(/at most 5 seats/i);
+  });
+
+  it("lets a valid seat count through every guard once the old subscription has ended", async () => {
+    await setOrgSubscription("canceled");
+    const { status } = await orgCheckout(2);
+    // Past all of checkout's own rules: what's left is the (fake) price failing at Stripe,
+    // or STRIPE_SECRET_KEY being unset in CI — either way, not a 422 from these guards.
+    expect(status).not.toBe(422);
+  });
+
+  async function individualCheckout() {
+    const res = await fetch(`http://localhost:${PORT}/billing/individual-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: soloCookie },
+      body: JSON.stringify({ planId: individualPaidSlug }),
+    });
+    return { status: res.status, body: (await res.json()) as { error?: { message: string } } };
+  }
+
+  it("rejects an individual checkout while the user already has a live subscription", async () => {
+    await withUserScope(soloId, async (tx) => {
+      await ensureUserBillingRow(tx, soloId);
+      await updateUserBillingByUserId(tx, soloId, {
+        providerSubscriptionId: `sub_guard_individual_${Date.now()}`,
+        subscriptionStatus: "active",
+      });
+    });
+    const { status, body } = await individualCheckout();
+    expect(status).toBe(422);
+    expect(body.error?.message).toMatch(/already have an active subscription/i);
+  });
+
+  it("lets an individual check out again once their subscription has ended", async () => {
+    await withUserScope(soloId, (tx) =>
+      updateUserBillingByUserId(tx, soloId, { subscriptionStatus: "canceled" }),
+    );
+    const { status } = await individualCheckout();
+    expect(status).not.toBe(422);
   });
 });

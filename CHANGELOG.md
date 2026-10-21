@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.26.0] — 2026-10-21
+
+### Added
+
+- `apps/portal`'s `/billing` page — the second vertical slice of `specs/customer-portal-plan.md`. One page for both billing universes: with an active organization it shows that org's seat-based plan, otherwise the user's own individual plan. Shows the current plan and status, lists the plans available to switch to, starts Stripe Checkout (organizations choose a seat count, defaulting to the current member count and capped at the plan's member limit), cancels a live subscription behind an explicit confirmation, and acknowledges the `?checkout=success|cancelled` return from Stripe. Org members without `billing:manage` see the plan read-only — gated by asking the server (Better Auth's `organization.hasPermission`, backed by the same `roles` map as `requirePermission`), not by comparing role names client-side. "Billing" added to the portal nav.
+- Every checkout now sends an `Idempotency-Key` — the first caller of the plumbing added in 0.22.0. One key per logical attempt (same plan, and for organizations the same seat count), reused across double-clicks and retries, regenerated only when the attempt changes, per `specs/billing-integrity-plan.md`'s Fix 2. Proven by a test that retries a failed checkout and asserts both requests carried the same key — and confirmed to fail when the hook is deliberately broken to mint a key per call.
+- `GET /billing/organization-plans` and `GET /billing/individual-plans` — a customer-facing, read-only view of the plan catalog (the catalog's own `/subscription-plans` routes are platform-staff-only, so a customer previously had no way to see what they could upgrade to). Returns display fields plus `isPurchasable`, never `providerPriceId`; the organization list includes that org's own custom plans (replacing a shared plan with the same slug, matching checkout's own resolution) and never another org's. 9 new tests in `billing-self-service.integration.test.ts`, including cross-org isolation.
+- `@repo/core/auth/permissions` subpath export, so client code can import the organization access-control statement without pulling in the DB-connecting `betterAuth()` instance. `apps/portal`'s `organizationClient()` now receives the same `ac`/`roles` as the server.
+
+### Changed
+
+- Checkout now refuses (422) while the caller already has a live subscription — previously a second checkout created a second, separately billed Stripe subscription. Organization checkout also enforces its seat count server-side: at least the current member count, at most the plan's member limit. Cancel refuses when there's no live subscription instead of calling Stripe on one that already ended.
+
+### Fixed
+
+- **Canceling kept paid features forever.** When a subscription ended, the webhook only set `subscriptionStatus: "canceled"` and left `plan` on the paid tier — and entitlements and seat limits resolve from `plan`. The webhook now returns the row to the default plan when a subscription ends (keeping the subscription id for late events). Migration `0020_reset_ended_subscription_plans.sql` backfills rows that were already canceled. This also let a canceled customer re-buy the same plan in the portal, which previously still showed it as their "current plan" with no way to choose it.
+- The customer plan list could offer a shared plan that checkout would always reject — when an org's own custom plan with the same slug had been retired. The custom-vs-shared precedence rule now lives in one function (`applyCustomPlanPrecedence`) used by both checkout's plan lookup and the list.
+- The billing page re-showed "Cancel subscription" right after a cancel (one refetch landed before Stripe's webhook did), inviting a second cancel. It now hides the button and polls briefly until Stripe confirms. Plans too small for the organization's current team are shown as unavailable rather than offered, and the plan summary no longer claims "free plan" for a plan staff arranged outside checkout.
+- The API's CORS config didn't allow the `Idempotency-Key` request header, so a browser's preflight would have blocked every cross-origin checkout from `apps/portal` before it was sent — invisible to the portal's unit tests, which mock `fetch`. Added to `allowHeaders` in `app.ts`, with an integration test that sends a real preflight.
+- `BILLING_CHECKOUT_RETURN_URL`'s default (and `.env.example`/CI) pointed Stripe's post-checkout redirect at `http://localhost:3000/billing` — `apps/admin`, a staff-only app with no billing page. Now `http://localhost:3002/billing` (`apps/portal`). If your own `.env.development` sets this variable, update it.
+
 ## [0.25.0] — 2026-08-07
 
 ### Added

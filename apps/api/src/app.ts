@@ -36,7 +36,9 @@ export const app = new Hono()
     cors({
       origin: (origin) => (allowedOrigins.includes(origin) ? origin : null),
       allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type", "Authorization"],
+      // Idempotency-Key: sent cross-origin by apps/portal's checkout (billing.controller.ts) —
+      // without it here, the browser's preflight blocks every checkout request.
+      allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
       credentials: true,
       maxAge: 600,
     }),

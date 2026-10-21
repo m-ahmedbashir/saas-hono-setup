@@ -19,8 +19,10 @@ function getStripeClient(): Stripe {
   return new Stripe(key);
 }
 
+// apps/portal's billing page, not apps/admin's — customers start checkout from the
+// portal; apps/admin is staff-only and has no /billing route at all.
 const checkoutReturnUrl =
-  process.env.BILLING_CHECKOUT_RETURN_URL ?? "http://localhost:3000/billing";
+  process.env.BILLING_CHECKOUT_RETURN_URL ?? "http://localhost:3002/billing";
 
 /**
  * Concrete Stripe adapter for the `BillingGateway` contract defined in

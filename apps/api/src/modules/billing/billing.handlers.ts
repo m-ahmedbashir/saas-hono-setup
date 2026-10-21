@@ -15,6 +15,7 @@ import {
 } from "./individual-billing.db";
 import { insertBillingEvent } from "./billing-events.db";
 import { insertInvoice, markInvoiceRefunded } from "./invoices.db";
+import { getDefaultPlanId } from "../subscription-plans/subscription-plans.service";
 import {
   notifyUsers,
   getPlatformStaffUserIds,
@@ -90,6 +91,15 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
   // the notification honest: it only ever reflects a billing update that actually landed.
   let pendingNotification: NotifyInput | null = null;
 
+  // Resolved before the transaction opens (getDefaultPlanId reads on its own connection),
+  // and only for events that end a subscription — see endsSubscription below.
+  const defaultPlans = endsSubscription(event)
+    ? {
+        organization: await getDefaultPlanId("organization"),
+        individual: await getDefaultPlanId("individual"),
+      }
+    : null;
+
   await withSystemScope(async (tx) => {
     // Fix 1 (inbound idempotency): resolve owner info *before* inserting — billing_events
     // can never be UPDATEd afterward to backfill it once written (see the table's
@@ -154,12 +164,16 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
           updateBillingBySubscriptionId(tx, event.providerSubscriptionId, event.eventCreatedAt, {
             subscriptionStatus: event.status,
             seatQuantity: event.seatQuantity,
+            ...(defaultPlans && { plan: defaultPlans.organization }),
           }),
           updateUserBillingBySubscriptionId(
             tx,
             event.providerSubscriptionId,
             event.eventCreatedAt,
-            { subscriptionStatus: event.status },
+            {
+              subscriptionStatus: event.status,
+              ...(defaultPlans && { plan: defaultPlans.individual }),
+            },
           ),
         ]);
         if (event.status === "past_due") {
@@ -176,12 +190,13 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
         const [updatedOrg, updatedUser] = await Promise.all([
           updateBillingBySubscriptionId(tx, event.providerSubscriptionId, event.eventCreatedAt, {
             subscriptionStatus: "canceled",
+            plan: defaultPlans!.organization,
           }),
           updateUserBillingBySubscriptionId(
             tx,
             event.providerSubscriptionId,
             event.eventCreatedAt,
-            { subscriptionStatus: "canceled" },
+            { subscriptionStatus: "canceled", plan: defaultPlans!.individual },
           ),
         ]);
         pendingNotification = await buildBillingIssueNotification(
@@ -248,6 +263,26 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
   if (pendingNotification) {
     await notifyUsers(await getPlatformStaffUserIds(), pendingNotification);
   }
+}
+
+/**
+ * Whether this event ends a subscription — Stripe signals that either as
+ * `customer.subscription.deleted` or as an `.updated` whose status is now canceled.
+ *
+ * An ended subscription returns the row to its owner type's default plan, keeping the
+ * subscription id. `plan` is what entitlements (entitlement.middleware.ts) and seat limits
+ * (seat-limit.middleware.ts) resolve from, so leaving the paid plan on a canceled row would
+ * keep granting it forever. Resetting it here — in the webhook, the single writer of
+ * subscription state — keeps every reader correct without each one re-deriving "is this
+ * plan still paid for?". History isn't lost: billing_events/invoices keep what was paid.
+ * The id stays so a late event for this subscription (e.g. its final invoice) still
+ * resolves to its owner instead of being rejected as unknown.
+ */
+function endsSubscription(event: BillingEvent): boolean {
+  return (
+    event.type === "subscription_canceled" ||
+    (event.type === "subscription_updated" && event.status === "canceled")
+  );
 }
 
 /**

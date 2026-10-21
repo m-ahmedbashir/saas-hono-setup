@@ -18,9 +18,12 @@ import { authClient, useSession } from "@/lib/auth-client";
 
 // Deliberately a flat top nav, not apps/admin's sidebar — this app has three pages, not
 // a staff back office (see specs/customer-portal-plan.md's Architecture section: "no
-// admin-style staff sidebar"). Billing/Team links are added once those pages exist
-// (this file's own next incremental step), not stubbed as dead links ahead of them.
-const NAV_LINKS = [{ href: "/profile", label: "Profile" }];
+// admin-style staff sidebar"). Team is added once that page exists, not stubbed as a
+// dead link ahead of it.
+const NAV_LINKS = [
+  { href: "/profile", label: "Profile" },
+  { href: "/billing", label: "Billing" },
+];
 
 function initials(name: string): string {
   return (

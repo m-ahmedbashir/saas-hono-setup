@@ -1,7 +1,8 @@
 import { createMiddleware } from "hono/factory";
-import { member, eq, count, withOrgScope } from "@repo/db";
+import { withOrgScope } from "@repo/db";
 import { AppError } from "@repo/core";
 import { getBillingByOrgId } from "../modules/billing/organization-billing.db";
+import { countOrganizationMembers } from "../modules/organization/organization.db";
 import {
   getPlanForBilling,
   getDefaultPlanId,
@@ -31,14 +32,9 @@ export const enforceSeatLimit = createMiddleware(async (c, next) => {
   const organizationId = userContext.organizationId;
   const { existingPlanId, activeMembers } = await withOrgScope(organizationId, async (tx) => {
     const billingRow = await getBillingByOrgId(tx, organizationId);
-    const [row] = await tx
-      .select({ activeMembers: count() })
-      .from(member)
-      .where(eq(member.organizationId, organizationId));
-
     return {
       existingPlanId: billingRow?.plan,
-      activeMembers: row?.activeMembers ?? 0,
+      activeMembers: await countOrganizationMembers(tx, organizationId),
     };
   });
   const planId = existingPlanId ?? (await getDefaultPlanId("organization"));
