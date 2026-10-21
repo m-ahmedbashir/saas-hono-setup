@@ -7,9 +7,11 @@ import { useAppForm } from "@/components/ui/tanstack-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Icons } from "@/components/icons";
 import { authClient } from "@/lib/auth-client";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 import { signInSchema, type SignInValues } from "../schemas/sign-in.schema";
 
-export function SignInView() {
+/** `redirectTo`: the page's untrusted `?redirect=` value — validated, never used as-is. */
+export function SignInView({ redirectTo }: { redirectTo?: string } = {}) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -25,7 +27,7 @@ export function SignInView() {
         setFormError(error.message ?? "Sign in failed");
         return;
       }
-      router.push("/profile");
+      router.push(safeRedirectPath(redirectTo));
     },
   });
 

@@ -6,12 +6,14 @@ import { useAppForm } from "@/components/ui/tanstack-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Icons } from "@/components/icons";
 import { authClient } from "@/lib/auth-client";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 import { signUpSchema, type SignUpValues } from "../schemas/sign-up.schema";
 
 // Better Auth's emailAndPassword config has no `autoSignIn: false` override (see
 // packages/core/src/auth/index.ts), so its default (true) applies — a successful signUp
 // call already establishes a real session, no separate sign-in step needed afterward.
-export function SignUpView() {
+/** `redirectTo`: the page's untrusted `?redirect=` value — validated, never used as-is. */
+export function SignUpView({ redirectTo }: { redirectTo?: string } = {}) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -25,7 +27,7 @@ export function SignUpView() {
         setFormError(error.message ?? "Sign up failed");
         return;
       }
-      router.push("/profile");
+      router.push(safeRedirectPath(redirectTo));
     },
   });
 

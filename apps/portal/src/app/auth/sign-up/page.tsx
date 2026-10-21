@@ -23,7 +23,18 @@ export const metadata: Metadata = {
 const GRAIN_BACKGROUND =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
-export default function SignUpPage() {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect?: string | string[] }>;
+}) {
+  const { redirect } = await searchParams;
+  // Passed through untouched — SignUpView validates it (safeRedirectPath) before use.
+  const redirectTo = typeof redirect === "string" ? redirect : undefined;
+  const signInHref = redirectTo
+    ? `/auth/sign-in?redirect=${encodeURIComponent(redirectTo)}`
+    : "/auth/sign-in";
+
   return (
     <div className={cn("grid min-h-screen w-full lg:grid-cols-[1.1fr_1fr]", displayFont.variable)}>
       <div className="relative hidden overflow-hidden bg-black lg:flex lg:flex-col lg:justify-between lg:p-12">
@@ -82,11 +93,11 @@ export default function SignUpPage() {
             </div>
           </div>
           <div className="animate-fade-in-up [animation-delay:120ms]">
-            <SignUpView />
+            <SignUpView redirectTo={redirectTo} />
           </div>
           <p className="animate-fade-in-up text-muted-foreground text-center text-sm [animation-delay:200ms]">
             Already have an account?{" "}
-            <Link href="/auth/sign-in" className="hover:text-primary underline underline-offset-4">
+            <Link href={signInHref} className="hover:text-primary underline underline-offset-4">
               Sign in
             </Link>
           </p>

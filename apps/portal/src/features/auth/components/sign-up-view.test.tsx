@@ -76,6 +76,27 @@ describe("SignUpView", () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/profile"));
   });
 
+  it("returns to a same-site redirect after sign-up (e.g. an invitation link), never an external one", async () => {
+    signUpEmailMock.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    const user = userEvent.setup();
+    const { unmount } = render(<SignUpView redirectTo="/auth/accept-invite?id=inv_1" />);
+
+    await user.type(screen.getByLabelText("Name"), "Ada Lovelace");
+    await user.type(screen.getByLabelText("Email"), "ada@example.com");
+    await user.type(screen.getByLabelText("Password"), "password1234");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/auth/accept-invite?id=inv_1"));
+
+    unmount();
+    pushMock.mockReset();
+    render(<SignUpView redirectTo="https://evil.example" />);
+    await user.type(screen.getByLabelText("Name"), "Ada Lovelace");
+    await user.type(screen.getByLabelText("Email"), "ada@example.com");
+    await user.type(screen.getByLabelText("Password"), "password1234");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/profile"));
+  });
+
   it("shows the server's error message and does not redirect when sign-up fails", async () => {
     signUpEmailMock.mockResolvedValue({
       data: null,

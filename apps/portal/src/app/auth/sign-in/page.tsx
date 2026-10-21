@@ -27,7 +27,18 @@ export const metadata: Metadata = {
 const GRAIN_BACKGROUND =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect?: string | string[] }>;
+}) {
+  const { redirect } = await searchParams;
+  // Passed through untouched — SignInView validates it (safeRedirectPath) before use.
+  const redirectTo = typeof redirect === "string" ? redirect : undefined;
+  const signUpHref = redirectTo
+    ? `/auth/sign-up?redirect=${encodeURIComponent(redirectTo)}`
+    : "/auth/sign-up";
+
   return (
     <div className={cn("grid min-h-screen w-full lg:grid-cols-[1.1fr_1fr]", displayFont.variable)}>
       {/* Left: editorial panel — hidden below lg, this app's "personality" lives here so the
@@ -99,11 +110,11 @@ export default function SignInPage() {
             </div>
           </div>
           <div className="animate-fade-in-up [animation-delay:120ms]">
-            <SignInView />
+            <SignInView redirectTo={redirectTo} />
           </div>
           <p className="animate-fade-in-up text-muted-foreground text-center text-sm [animation-delay:200ms]">
             Don&apos;t have an account?{" "}
-            <Link href="/auth/sign-up" className="hover:text-primary underline underline-offset-4">
+            <Link href={signUpHref} className="hover:text-primary underline underline-offset-4">
               Sign up
             </Link>
           </p>
