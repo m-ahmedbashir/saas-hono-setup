@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.28.0] — 2026-10-22
+
+### Added
+
+- Organization switcher in `apps/portal`'s nav — the last piece of `specs/customer-portal-plan.md`. Shows which account the portal is acting for (an organization, or "Personal account") and switches between them; billing and team follow the choice. Only shown to users who belong to at least one organization. Every switch invalidates all cached data, per the spec's "Org-switch cache invalidation", so billing can never keep showing the previous organization's plan — one shared `useSwitchOrganization` hook does this for both the switcher and `/team`'s "Choose an organization". Better Auth verifies membership server-side before switching.
+
+### Fixed
+
+- The portal's account menu (Profile / Sign out) crashed the moment it opened, since 0.25.0: Base UI throws when a menu label isn't inside a menu group (`MenuGroupContext is missing`), and the label was placed directly in the menu. Nothing caught it because nothing ever opened the menu in a test. Now wrapped in a `DropdownMenuGroup` — the pattern `apps/admin` already follows — with a test that opens it.
+
 ## [0.27.0] — 2026-10-22
 
 ### Added

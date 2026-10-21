@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -16,6 +17,7 @@ import { Icons } from "@/components/icons";
 import { cn } from "@repo/shared/utils";
 import { authClient, useSession } from "@/lib/auth-client";
 import { initials } from "@/lib/initials";
+import { OrganizationSwitcher } from "./organization-switcher";
 
 // Deliberately a flat top nav, not apps/admin's sidebar — this app has three pages, not
 // a staff back office (see specs/customer-portal-plan.md's Architecture section: "no
@@ -46,6 +48,7 @@ export function PortalNav() {
             <Icons.logo className="text-primary size-5" />
             <span className="hidden sm:inline">Account</span>
           </Link>
+          <OrganizationSwitcher />
           <nav className="flex items-center gap-1">
             {navLinks.map((link) => (
               <Link
@@ -81,10 +84,13 @@ export function PortalNav() {
               <Icons.chevronDown className="text-muted-foreground size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="min-w-0">
-                <p className="truncate text-sm font-medium">{user.name}</p>
-                <p className="text-muted-foreground truncate text-xs font-normal">{user.email}</p>
-              </DropdownMenuLabel>
+              {/* Base UI requires a menu label inside a group — without it the menu throws on open. */}
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="min-w-0">
+                  <p className="truncate text-sm font-medium">{user.name}</p>
+                  <p className="text-muted-foreground truncate text-xs font-normal">{user.email}</p>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => router.push("/profile")}>
                 <Icons.profile className="mr-2 size-4" />

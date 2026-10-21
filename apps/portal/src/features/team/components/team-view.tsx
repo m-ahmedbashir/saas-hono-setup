@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import PageContainer from "@/components/layout/page-container";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,6 +8,7 @@ import { cn } from "@repo/shared/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Icons } from "@/components/icons";
 import { authClient, useSession } from "@/lib/auth-client";
+import { useSwitchOrganization } from "@/hooks/use-switch-organization";
 import { canManageTeam } from "../api/service";
 import type { ActiveOrganization } from "../types";
 import { InvitationList, pendingInvitations } from "./invitation-list";
@@ -86,12 +86,8 @@ function TeamPanel({
  */
 function ChooseOrganization() {
   const { data: organizations, isPending } = authClient.useListOrganizations();
-  const open = useMutation({
-    mutationFn: async (organizationId: string) => {
-      const { error } = await authClient.organization.setActive({ organizationId });
-      if (error) throw new Error(error.message ?? "Could not open that organization");
-    },
-  });
+  // Same hook as the nav's switcher, so every org switch also clears cached data.
+  const open = useSwitchOrganization();
 
   if (isPending) return <TeamSkeleton />;
   if (!organizations || organizations.length === 0) return <NoOrganization />;

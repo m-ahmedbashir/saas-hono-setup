@@ -2,10 +2,10 @@
 
 Point-in-time status of what's actually built and verified in this repo. This is a log, not a rulebook — see [AGENTS.md](./AGENTS.md) for the durable conventions every agent must follow regardless of what's implemented yet. Keep this honest: update it as things land, don't let it drift from reality.
 
-## Where things stand (2026-10-22, version 0.27.0)
+## Where things stand (2026-10-22, version 0.28.0)
 
 - **Three apps:** `apps/api` (the only backend), `apps/admin` (staff back office), `apps/portal` (customers). See [ARCHITECTURE.md](./ARCHITECTURE.md) for how they fit together.
-- **Customer portal** (`specs/customer-portal-plan.md`, branch `feature/customer-portal-adding`): sign-up/sign-in, profile, billing (view, upgrade, cancel), team management (invite by link, cancel invitation, change role, remove), and accept-invite are built and tested. **Still open on this branch:** the organization switcher.
+- **Customer portal** (`specs/customer-portal-plan.md`, branch `feature/customer-portal-adding`): sign-up/sign-in, profile, billing (view, upgrade, cancel), team management (invite by link, cancel invitation, change role, remove), accept-invite, and the organization switcher are built and tested — the spec's v1 scope is complete.
 - **Verified on the final code:** `apps/api` 172/172 integration tests (17 files), `apps/portal` 63/63, `packages/core` 5/5, `apps/admin` 11/11; typecheck, lint and production builds clean.
 - **Not verified:** no one has clicked through the team/invite flow in a real browser with two real accounts — the server side is covered by integration tests, the screens by component tests.
 
@@ -69,6 +69,7 @@ Point-in-time status of what's actually built and verified in this repo. This is
 - **0.25 — `apps/portal`** created (sign-in, sign-up, profile) and `packages/shared` extracted from `apps/admin`.
 - **0.26 — Portal billing page** and the fixes found reviewing it: canceling now returns the row to the default plan (paid features used to persist forever after cancel), checkout refused while a subscription is live, seat counts validated server-side, one shared custom-vs-shared plan precedence rule, customer-facing plan list, `Idempotency-Key` on every checkout. **Seat limits** enforced through Better Auth's own `invitationLimit`/`membershipLimit` hooks (the old `enforceSeatLimit` middleware was never attached to a route and is deleted), capped at the seats actually paid for, which checkout now records.
 - **0.27 — Portal team page and accept-invite flow**, safe `?redirect=` on sign-in/sign-up, organization chooser for sessions with no active organization.
+- **0.28 — Organization switcher** in the portal nav (every switch invalidates cached data); the portal's account menu, which had crashed on open since 0.25, fixed.
 
 ## Bugs found and fixed along the way (worth knowing so they aren't reintroduced)
 
@@ -100,7 +101,6 @@ Do not build on these without checking they still make sense first — see [AGEN
 ## Not done
 
 - OpenAPI docs (`@hono/zod-openapi` + `@scalar/hono-api-reference`) discussed, not adopted — no Zod-schema-based REST route exists yet to establish the convention on (the WS notification route doesn't go through that pattern).
-- **Organization switcher** in the portal nav — the last open item on the customer-portal branch (spec: "Org-switch cache invalidation"). Today `/team` lets a user open an organization only when none is active.
 - **Stripe Customer Portal** (plan switching with proration, cancel at period end, card updates, buying more seats) — agreed direction, not started; its own spec and branch. Until then, changing plans means cancel first, and an org can't add seats to a live subscription.
 - **Invitation emails** — no email provider; invitations are shareable links. (The invite → accept round trip itself is now tested end to end in `organization-permissions.integration.test.ts`, including seat-limit refusals.)
 - **Real-browser end-to-end tests** — none; the team/invite and checkout flows have never been clicked through by an automated browser.
