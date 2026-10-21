@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [0.27.0] — 2026-10-22
+
+### Added
+
+- `apps/portal`'s `/team` page — the third vertical slice of `specs/customer-portal-plan.md`, for organizations only (an individual account sees an explanation instead; "Team" appears in the nav only with an active organization). Lists members with their roles; owners/admins can invite someone by email with a role (member or admin) and get a shareable link — there's no invitation email yet — see and cancel pending invitations, change a member's role, and remove a member behind an explicit confirmation. No actions are offered on the owner's row or your own. Who may manage the team is checked against the same `roles` map the server enforces with (`Role.authorize()` on the caller's role from the live member list), never inferred from role names — no extra network call, and it follows role changes immediately. An org member whose session has no active organization yet (Better Auth doesn't pick one at sign-in) is offered their organizations to open, rather than being told they only have a personal account; "Team" shows in the nav for anyone who belongs to an organization. Reads come straight from Better Auth's reactive `useActiveOrganization()`, which refreshes itself after every team change. Seat-limit refusals are explained in plain words ("every seat on your plan is taken…") instead of raw error codes.
+- `/auth/accept-invite?id=…` — where an invitation link lands. Signed out: sign in or create an account, then come straight back. Signed in as the invited person: see who invited you to which organization, then accept (lands on its team, now your active organization) or decline. Signed in as someone else, an expired/used invitation, or a full organization are each explained.
+- Sign-in and sign-up accept a `?redirect=` so a visitor can return to where they were going (e.g. an invitation). Only same-site paths are honored (`src/lib/safe-redirect.ts`), decided by the standard URL parser rather than string-prefix checks — absolute, protocol-relative, `javascript:`, control-character tricks like `/%09/evil.example` (which browsers normalize to `//evil.example`), and dot-segment tricks like `/.//evil.example` (which the parser itself normalizes to `//evil.example`) all fall back to `/profile`, so it can't be used as an open redirect. The check is applied to the exact path returned, not just the input. Two earlier drafts in this same release were bypassable (the control-character trick, caught by code review; the dot-segment one, caught by security review) — both fixed before shipping, each with regression tests.
+
+### Fixed
+
+- `apps/portal/components.json` pointed shadcn's CLI at a non-existent `@/lib/utils` and the wrong stylesheet path, so `shadcn add` would have generated components that don't compile. Now `@repo/shared/utils` and `src/styles/globals.css`.
+
 ## [0.26.0] — 2026-10-21
 
 ### Added

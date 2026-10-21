@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useAppForm } from "@/components/ui/tanstack-form";
 import {
@@ -23,14 +23,19 @@ export function InviteMemberDialog() {
   const [open, setOpen] = useState(false);
   const [createdLink, setCreatedLink] = useState<string | null>(null);
   const invite = useMutation({ mutationFn: inviteMember });
+  // Which opening of the dialog a request belongs to. Closing bumps it, so an invite
+  // still in flight when the dialog was dismissed can't later fill in a fresh, reopened
+  // dialog with the previous person's link.
+  const session = useRef(0);
 
   const form = useAppForm({
     defaultValues: { email: "", role: "member" } as InviteValues,
     validators: { onSubmit: inviteSchema },
     onSubmit: async ({ value }) => {
+      const requestedIn = session.current;
       try {
         const invitation = await invite.mutateAsync(value);
-        setCreatedLink(inviteLink(invitation.id));
+        if (requestedIn === session.current) setCreatedLink(inviteLink(invitation.id));
       } catch {
         // Surfaced via invite.error below.
       }
@@ -40,6 +45,7 @@ export function InviteMemberDialog() {
   function close(next: boolean) {
     setOpen(next);
     if (!next) {
+      session.current += 1;
       setCreatedLink(null);
       invite.reset();
       form.reset();

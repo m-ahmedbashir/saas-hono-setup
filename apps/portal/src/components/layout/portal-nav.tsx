@@ -15,33 +15,28 @@ import {
 import { Icons } from "@/components/icons";
 import { cn } from "@repo/shared/utils";
 import { authClient, useSession } from "@/lib/auth-client";
+import { initials } from "@/lib/initials";
 
 // Deliberately a flat top nav, not apps/admin's sidebar — this app has three pages, not
 // a staff back office (see specs/customer-portal-plan.md's Architecture section: "no
-// admin-style staff sidebar"). Team is added once that page exists, not stubbed as a
-// dead link ahead of it.
-const NAV_LINKS = [
+// admin-style staff sidebar"). Team appears for anyone who belongs to an organization —
+// not only when one is active, since Better Auth doesn't pick one at sign-in and /team
+// lets them choose — and never for an individual account with no team.
+const BASE_LINKS = [
   { href: "/profile", label: "Profile" },
   { href: "/billing", label: "Billing" },
 ];
-
-function initials(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
+const TEAM_LINK = { href: "/team", label: "Team" };
 
 export function PortalNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+  const { data: activeOrganization } = authClient.useActiveOrganization();
+  const { data: organizations } = authClient.useListOrganizations();
   const user = session?.user;
+  const hasOrganization = Boolean(activeOrganization) || (organizations?.length ?? 0) > 0;
+  const navLinks = hasOrganization ? [...BASE_LINKS, TEAM_LINK] : BASE_LINKS;
 
   return (
     <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40 border-b backdrop-blur">
@@ -52,7 +47,7 @@ export function PortalNav() {
             <span className="hidden sm:inline">Account</span>
           </Link>
           <nav className="flex items-center gap-1">
-            {NAV_LINKS.map((link) => (
+            {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}

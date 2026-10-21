@@ -3,6 +3,7 @@
 // side (packages/core's auth config), same reasoning as apps/admin's users feature. Reads
 // come from Better Auth's own reactive useActiveOrganization() (it refetches after every
 // /organization/* call), so only writes live here.
+import { roles } from "@repo/core/auth/permissions";
 import { authClient } from "@/lib/auth-client";
 
 export type InvitableRole = "member" | "admin";
@@ -49,13 +50,26 @@ export async function updateMemberRole(input: { memberId: string; role: Invitabl
   return unwrap(await authClient.organization.updateMemberRole(input));
 }
 
-// Asks the server (Better Auth's /organization/has-permission, same `roles` map the routes
-// enforce with) rather than comparing role names here — UX gating only.
-export async function canManageTeam(): Promise<boolean> {
-  const result = await authClient.organization.hasPermission({
-    permissions: { invitation: ["create", "cancel"], member: ["update", "delete"] },
-  });
-  return unwrap(result).success;
+/**
+ * Whether a member with this role may invite/remove people and change roles — checked
+ * against the same `roles` map the server enforces with (`Role.authorize()`, exactly what
+ * apps/api's requirePermission runs), never by comparing role names. Takes the caller's
+ * role from the live member list rather than calling /organization/has-permission: that's
+ * no network round trip (and no extra full-organization refetch, which every
+ * /organization/* call triggers in Better Auth's client), and it can't go stale — the
+ * member list refreshes itself after any role change. UX gating only; the server checks
+ * every action regardless. A member can hold several comma-separated roles; any one that
+ * grants it is enough, same as on the server.
+ */
+export function canManageTeam(role: string | undefined): boolean {
+  if (!role) return false;
+  return role.split(",").some(
+    (name) =>
+      roles[name.trim() as keyof typeof roles]?.authorize({
+        invitation: ["create", "cancel"],
+        member: ["update", "delete"],
+      }).success === true,
+  );
 }
 
 export async function getInvitation(invitationId: string) {

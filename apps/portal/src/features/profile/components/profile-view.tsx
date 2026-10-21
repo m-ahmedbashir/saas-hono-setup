@@ -3,20 +3,9 @@
 import PageContainer from "@/components/layout/page-container";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSession } from "@/lib/auth-client";
+import { initials } from "@/lib/initials";
 import { UpdateNameForm } from "./update-name-form";
 import { ChangePasswordForm } from "./change-password-form";
-
-function initials(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
 
 export function ProfileView() {
   const { data: session, isPending } = useSession();

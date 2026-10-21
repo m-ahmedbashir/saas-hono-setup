@@ -24,7 +24,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Icons } from "@/components/icons";
 import { describeTeamError, removeMember, updateMemberRole } from "../api/service";
-import { initials, roleLabel } from "../lib/format";
+import { initials } from "@/lib/initials";
+import { roleLabel } from "../lib/format";
 import type { TeamMember } from "../types";
 
 export function MemberList({
@@ -39,7 +40,10 @@ export function MemberList({
   const [toRemove, setToRemove] = useState<TeamMember | null>(null);
   const changeRole = useMutation({ mutationFn: updateMemberRole });
   const remove = useMutation({ mutationFn: removeMember });
+  // One banner for the latest action only — starting either action clears the other's old
+  // error, so a stale failure never lingers above a later success.
   const error = changeRole.error ?? (toRemove ? null : remove.error);
+  const busyMemberId = changeRole.isPending ? changeRole.variables?.memberId : undefined;
 
   return (
     <section aria-labelledby="members-heading" className="bg-card rounded-xl border">
@@ -85,8 +89,9 @@ export function MemberList({
                       <Button
                         variant="ghost"
                         size="icon"
+                        disabled={busyMemberId === member.id}
                         aria-label={`Actions for ${member.user.name}`}
-                        className="focus-visible:ring-ring shrink-0 focus-visible:ring-2 focus-visible:ring-offset-2"
+                        className="focus-visible:ring-ring shrink-0 focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       />
                     }
                   >
@@ -94,12 +99,13 @@ export function MemberList({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
-                      onClick={() =>
+                      onClick={() => {
+                        remove.reset();
                         changeRole.mutate({
                           memberId: member.id,
                           role: member.role === "admin" ? "member" : "admin",
-                        })
-                      }
+                        });
+                      }}
                     >
                       {member.role === "admin" ? "Make member" : "Make admin"}
                     </DropdownMenuItem>
@@ -107,6 +113,7 @@ export function MemberList({
                     <DropdownMenuItem
                       variant="destructive"
                       onClick={() => {
+                        changeRole.reset();
                         remove.reset();
                         setToRemove(member);
                       }}

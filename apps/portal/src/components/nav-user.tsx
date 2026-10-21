@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Icons } from "@/components/icons";
 import { authClient, useSession } from "@/lib/auth-client";
+import { initials } from "@/lib/initials";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -20,18 +21,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-
-function initials(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "?"
-  );
-}
 
 export function NavUser() {
   const { isMobile } = useSidebar();
