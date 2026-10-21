@@ -49,6 +49,13 @@ APP_ROLE_PASSWORD=<a-real-secret> pnpm --filter @repo/db create-app-role
 # then add to .env.development:
 # APP_DATABASE_URL=postgresql://app_user:<that password>@<host>/<db>
 
+# Create the restricted `app_user` role migrations and RLS depend on — do this before
+# the first migration, not after (some migrations grant/revoke privileges on app_user
+# by name, so it must already exist):
+APP_ROLE_PASSWORD=<a-real-secret> pnpm --filter @repo/db create-app-role
+# then add to .env.development:
+# APP_DATABASE_URL=postgresql://app_user:<that password>@<host>/<db>
+
 pnpm db:generate   # generate SQL migrations from packages/db/src/schema.ts
 pnpm db:migrate    # apply them to your database
 
