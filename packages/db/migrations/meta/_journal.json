@@ -141,6 +141,13 @@
       "when": 1785974968185,
       "tag": "0019_billing_events_immutability",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792618780798,
+      "tag": "0020_reset_ended_subscription_plans",
+      "breakpoints": true
     }
   ]
 }

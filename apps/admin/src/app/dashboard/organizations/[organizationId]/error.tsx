@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
-import { ApiError } from "@/lib/api-client";
+import { ApiError } from "@repo/shared/api-client";
 
 interface ErrorProps {
   error: Error & { digest?: string };

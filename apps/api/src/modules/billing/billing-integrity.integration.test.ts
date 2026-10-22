@@ -74,7 +74,12 @@ function checkoutCompletedPayload(eventId: string, subscriptionId: string, creat
         client_reference_id: orgId,
         customer: `cus_test_${eventId}`,
         subscription: subscriptionId,
-        metadata: { ownerType: "organization", ownerId: orgId, planId: "starter" },
+        metadata: {
+          ownerType: "organization",
+          ownerId: orgId,
+          planId: "starter",
+          seatQuantity: "3",
+        },
       },
     },
   });
@@ -96,6 +101,23 @@ function subscriptionUpdatedPayload(
         id: subscriptionId,
         object: "subscription",
         status,
+        items: { data: [{ quantity: 1 }] },
+      },
+    },
+  });
+}
+
+function subscriptionDeletedPayload(eventId: string, subscriptionId: string, createdAt: number) {
+  return JSON.stringify({
+    id: eventId,
+    object: "event",
+    type: "customer.subscription.deleted",
+    created: createdAt,
+    data: {
+      object: {
+        id: subscriptionId,
+        object: "subscription",
+        status: "canceled",
         items: { data: [{ quantity: 1 }] },
       },
     },
@@ -416,6 +438,54 @@ describe("Out-of-order delivery (Fix 3)", () => {
       tx.select().from(billingTable).where(eq(billingTable.providerSubscriptionId, subscriptionId)),
     );
     expect(finalRow?.subscriptionStatus).toBe("canceled");
+    // A canceled status reached via subscription.updated ends the subscription just the
+    // same as subscription.deleted does — see the "Ending a subscription" block below.
+    expect(finalRow?.plan).toBe("free");
+  }, 15000);
+});
+
+// The billing row's `plan` is what entitlements and seat limits resolve from
+// (entitlement.middleware.ts / getOrganizationSeatLimit), so a subscription that has ended
+// must stop granting its paid plan — otherwise canceling keeps paid access forever. Stripe's
+// webhook stays the single writer of that change.
+describe("Ending a subscription", () => {
+  it("customer.subscription.deleted returns the organization to the default plan, keeping the subscription id", async () => {
+    const subscriptionId = `sub_test_ended_${Date.now()}`;
+    cleanupSubscriptionIds.push(subscriptionId);
+    const now = Math.floor(Date.now() / 1000);
+    await sendWebhook(
+      checkoutCompletedPayload(`evt_test_ended_checkout_${Date.now()}`, subscriptionId, now),
+    );
+
+    const [paid] = await withSystemScope((tx) =>
+      tx.select().from(billingTable).where(eq(billingTable.providerSubscriptionId, subscriptionId)),
+    );
+    expect(paid?.plan).toBe("starter");
+    // The seats paid for at checkout — what caps membership while the subscription is live
+    // (billing.service.ts's getOrganizationSeatUsage). Carried in checkout metadata, since
+    // Stripe's checkout.session.completed payload doesn't include line-item quantities.
+    expect(paid?.seatQuantity).toBe(3);
+
+    // Stamped later than anything the out-of-order test above applied to this same org's
+    // row (it goes up to now + 3600) — otherwise the row's lastEventAt guard rightly
+    // treats this as an older, out-of-order event and skips it.
+    const res = await sendWebhook(
+      subscriptionDeletedPayload(
+        `evt_test_ended_deleted_${Date.now()}`,
+        subscriptionId,
+        now + 7200,
+      ),
+    );
+    expect(res.status).toBe(200);
+
+    const [ended] = await withSystemScope((tx) =>
+      tx.select().from(billingTable).where(eq(billingTable.providerSubscriptionId, subscriptionId)),
+    );
+    expect(ended?.subscriptionStatus).toBe("canceled");
+    expect(ended?.plan).toBe("free");
+    // Kept, not cleared: a late event for the ended subscription (e.g. its final invoice)
+    // must still resolve to this owner rather than be rejected as unknown.
+    expect(ended?.providerSubscriptionId).toBe(subscriptionId);
   }, 15000);
 });
 

@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch } from "@repo/shared/api-client";
 import type { Notification, NotificationListFilters, NotificationsResponse } from "./types";
 
 export async function getNotifications(

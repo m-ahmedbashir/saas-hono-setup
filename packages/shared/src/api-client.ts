@@ -3,8 +3,10 @@
 // parsing exist in exactly one place. Matches apps/api's real response shape (verified
 // against packages/core/src/errors.ts and apps/api/src/lib/response.ts, not guessed):
 // { success: true, data } / { success: false, error: { code, message, details? } }.
-// Doesn't apply to Better Auth calls — those go through src/lib/auth-client.ts, which
-// has its own { data, error } contract and its own cookie handling.
+// Doesn't apply to Better Auth calls — those go through each app's own auth-client.ts,
+// which has its own { data, error } contract and its own cookie handling. Shared between
+// apps/admin and apps/portal (see specs/customer-portal-plan.md's Architecture section) —
+// this wrapper has zero audience-specific logic, unlike auth-client.ts's plugin set.
 
 export type ErrorCode =
   | "UNAUTHENTICATED"

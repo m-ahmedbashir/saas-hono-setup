@@ -49,6 +49,13 @@ APP_ROLE_PASSWORD=<a-real-secret> pnpm --filter @repo/db create-app-role
 # then add to .env.development:
 # APP_DATABASE_URL=postgresql://app_user:<that password>@<host>/<db>
 
+# Create the restricted `app_user` role migrations and RLS depend on — do this before
+# the first migration, not after (some migrations grant/revoke privileges on app_user
+# by name, so it must already exist):
+APP_ROLE_PASSWORD=<a-real-secret> pnpm --filter @repo/db create-app-role
+# then add to .env.development:
+# APP_DATABASE_URL=postgresql://app_user:<that password>@<host>/<db>
+
 pnpm db:generate   # generate SQL migrations from packages/db/src/schema.ts
 pnpm db:migrate    # apply them to your database
 
@@ -57,7 +64,7 @@ pnpm db:migrate    # apply them to your database
 # "growth"/"individual_pro"/"starter" won't resolve to any real entitlements:
 pnpm --filter @repo/api seed:subscription-plans
 
-pnpm dev           # boots apps/api on http://localhost:8787
+pnpm dev           # boots every app via Turborepo: apps/api :8787, apps/admin :3000, apps/portal :3002
 ```
 
 Confirm it's up:
@@ -96,18 +103,21 @@ See `.env.example` for the full list with comments. Summary:
 | `STRIPE_WEBHOOK_SECRET`                                     | Signing secret for `/billing/webhook`, from the Stripe CLI or dashboard                                                                                                  |
 | `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_GROWTH`              | Stripe Price IDs backing the organization (seat-based) paid tiers                                                                                                        |
 | `STRIPE_PRICE_INDIVIDUAL_PRO`                               | Stripe Price ID backing the individual (B2C) paid tier                                                                                                                   |
-| `BILLING_CHECKOUT_RETURN_URL`                               | Where Stripe Checkout redirects back to after a session completes/cancels                                                                                                |
+| `BILLING_CHECKOUT_RETURN_URL`                               | Where Stripe Checkout redirects back to after a session completes/cancels — `apps/portal`'s `/billing` page (default `http://localhost:3002/billing`)                    |
 
 `.env.development` / `.env.test` are gitignored — they're for your local machine only. `NODE_ENV` itself is **not** set in any env file; each `apps/api` script sets it directly (`dev` → `development`, `start` → `production`, `test` → `test`) via `cross-env`, so it's always correct regardless of which command runs. Real production secrets should come from your hosting platform's env var injection at deploy time, never from a committed file.
 
 ## Project structure
 
 ```
-apps/api/                  Hono server — the only deployable app right now
+apps/api/                  Hono server — the backend every frontend app talks to
   src/index.ts              entrypoint: middleware chain, route composition, exports AppType for RPC clients
   src/middleware/            injectUserContext (auth), requirePermission (PBAC), requireFeature (plan entitlements)
   src/lib/                   response.ts — the API's success/error envelope
   src/modules/auth/          proxies to Better Auth's own handler
+
+apps/admin/                 Next.js staff back office (platform admin/support) — see apps/admin/AGENTS.md
+apps/portal/                Next.js customer-facing app (B2B org members + B2C individuals) — see specs/customer-portal-plan.md
 
 packages/db/                Drizzle schema + client, owns migrations
   src/schema.ts              table definitions (auth tables are generated, see below)
@@ -116,6 +126,8 @@ packages/db/                Drizzle schema + client, owns migrations
 packages/core/              environment-agnostic domain logic — no Hono, no HTTP
   src/auth/                  Better Auth config + access control (permissions)
   src/errors.ts              AppError + error codes, shared by the whole API
+
+packages/shared/            Cross-app frontend infrastructure (apiFetch, getQueryClient, cn) — not shadcn components, those are vendored per app
 ```
 
 ## Architecture
@@ -155,7 +167,7 @@ Run from the repo root (fans out via Turborepo) or scoped with `--filter @repo/a
 
 | Script              | What it does                                              |
 | ------------------- | --------------------------------------------------------- |
-| `pnpm dev`          | Start `apps/api` in watch mode                            |
+| `pnpm dev`          | Start every app (fans out via Turborepo)                  |
 | `pnpm build`        | Compile all packages                                      |
 | `pnpm test`         | Run tests                                                 |
 | `pnpm typecheck`    | `tsc --noEmit` across the monorepo                        |
@@ -186,7 +198,7 @@ If a new table is involved, add it to `packages/db/src/schema.ts`, then `pnpm db
 
 ## Contributing
 
-[`AGENTS.md`](./AGENTS.md) is the full set of engineering conventions for this repo — architecture rules, the DDD/SOLID reasoning behind the package split, the auth model in detail, and the response contract. It was written for AI coding agents working in this repo, but every rule in it applies equally to a human contributor. Read it before opening a PR. [`PROGRESS.md`](./PROGRESS.md) tracks what's actually implemented and verified at any given time, separate from the standing rules.
+Start with [`ARCHITECTURE.md`](./ARCHITECTURE.md) for a bird's-eye view of how the apps and packages fit together, with diagrams of the main flows. [`AGENTS.md`](./AGENTS.md) is the full set of engineering conventions for this repo — architecture rules, the DDD/SOLID reasoning behind the package split, the auth model in detail, and the response contract. It was written for AI coding agents working in this repo, but every rule in it applies equally to a human contributor. Read it before opening a PR. [`PROGRESS.md`](./PROGRESS.md) tracks what's actually implemented and verified at any given time, separate from the standing rules.
 
 ## Changelog
 

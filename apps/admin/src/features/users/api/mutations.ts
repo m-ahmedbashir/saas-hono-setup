@@ -1,5 +1,5 @@
 import { mutationOptions } from "@tanstack/react-query";
-import { getQueryClient } from "@/lib/query-client";
+import { getQueryClient } from "@repo/shared/query-client";
 import { createEmployee, setUserRole, banUser, unbanUser, removeUser } from "./service";
 import { userKeys } from "./queries";
 import type { CreateEmployeePayload, PlatformRole } from "./types";

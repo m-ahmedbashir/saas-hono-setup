@@ -4,7 +4,7 @@ import * as React from "react";
 import { DayPicker } from "react-day-picker";
 import type { ComponentProps } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@repo/shared/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
 

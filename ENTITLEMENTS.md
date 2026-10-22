@@ -85,12 +85,12 @@ deliberate choices worth calling out:
 
 **1. `scope` is a required argument, never inferred from `userContext.mode`.**
 
-The tempting shortcut: branch on `userContext.mode` the way `requirePermission` and
-`enforceSeatLimit` already do (B2B2C → org logic, B2C → pass-through/individual logic).
-That shortcut is wrong here specifically because entitlements — unlike permissions and
-seat limits — are a real, separate concept on **both** sides. `requirePermission`/
-`enforceSeatLimit` can treat B2C as "pass through" because there's nothing on the
-individual side for them to check (no org role, no seat concept). Entitlements don't
+The tempting shortcut: branch on `userContext.mode` the way `requirePermission` already
+does (B2B2C → org logic, B2C → pass-through/individual logic). That shortcut is wrong
+here specifically because entitlements — unlike permissions and seat limits — are a
+real, separate concept on **both** sides. `requirePermission` can treat B2C as "pass
+through" because there's nothing on the individual side for it to check (no org role),
+and seat limits only exist for organizations at all. Entitlements don't
 have that luxury: an individual has their own plan and their own entitlements too.
 
 If `scope` were inferred from session mode instead of declared by the route, a route
@@ -110,10 +110,11 @@ entirely, by construction.
 `packages/core/src/errors.ts`'s `ErrorCode` is a closed union — `AGENTS.md` is explicit
 that a new failure case gets a new code added there, never a bespoke string thrown
 ad hoc. `PAYMENT_REQUIRED` (402) already exists and already means exactly this ("your
-current plan doesn't cover this") — `enforceSeatLimit` throws it for the same class of
-problem (a plan limit). Reusing it keeps the two plan-gate failure modes in this app
-indistinguishable at the protocol level on purpose: a client only needs to handle
-"upgrade required," not learn a second code that means the same thing.
+current plan doesn't cover this"). Reusing it means a client only needs to handle
+"upgrade required," not learn a second code that means the same thing. (Seat limits are
+the one plan gate that doesn't use it: they're enforced inside Better Auth's own
+invite/join routes, which answer with Better Auth's `INVITATION_LIMIT_REACHED` /
+`ORGANIZATION_MEMBERSHIP_LIMIT_REACHED` — see AGENTS.md's Billing model section.)
 
 **3. Missing org context (`scope: "organization"` with no active org) is a distinct
 error from "plan too low."**

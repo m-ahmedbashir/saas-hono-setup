@@ -13,7 +13,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { cn } from "@repo/shared/utils";
 import * as React from "react";
 
 interface DataTableViewOptionsProps<TData> {
