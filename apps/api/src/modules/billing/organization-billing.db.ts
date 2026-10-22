@@ -1,4 +1,14 @@
-import { organizationBilling, eq, and, or, isNull, lt, count, type DbExecutor } from "@repo/db";
+import {
+  organizationBilling,
+  eq,
+  and,
+  or,
+  isNull,
+  lt,
+  lte,
+  count,
+  type DbExecutor,
+} from "@repo/db";
 import type { OrganizationPlanId, SubscriptionStatus } from "@repo/core";
 
 // Every function here requires an explicit `tx` — a `withOrgScope`/`withSystemScope`
@@ -47,6 +57,9 @@ interface BillingUpdate {
   providerSubscriptionId: string;
   subscriptionStatus: SubscriptionStatus;
   seatQuantity: number;
+  // Reset to null when a new subscription starts on this row — see billing.handlers.ts's
+  // checkout_completed case.
+  lastEventAt: Date | null;
 }
 
 export async function updateBillingByOrgId(
@@ -74,13 +87,22 @@ export async function updateBillingByOrgId(
  * strictly older than the incoming event's own timestamp is required for the write to
  * take effect at all; an out-of-order event matches zero rows here — a real no-op, not a
  * mistaken overwrite.
+ *
+ * Ties: Stripe stamps events to the second, so two events for one subscription can share a
+ * timestamp (canceling immediately emits `.updated` and `.deleted` within the same second).
+ * Neither arrival order may decide the outcome, so an event that ends the subscription
+ * (`endsSubscription`) also applies at an equal timestamp, and any other event doesn't — a
+ * deleted Stripe subscription can never become active again, so the ending event is always
+ * the correct final state of a tie.
  */
 export async function updateBillingBySubscriptionId(
   tx: DbExecutor,
   providerSubscriptionId: string,
   eventCreatedAt: Date,
   values: Partial<BillingUpdate>,
+  { endsSubscription }: { endsSubscription: boolean },
 ) {
+  const notNewer = endsSubscription ? lte : lt;
   const [updated] = await tx
     .update(organizationBilling)
     .set({ ...values, lastEventAt: eventCreatedAt })
@@ -89,7 +111,7 @@ export async function updateBillingBySubscriptionId(
         eq(organizationBilling.providerSubscriptionId, providerSubscriptionId),
         or(
           isNull(organizationBilling.lastEventAt),
-          lt(organizationBilling.lastEventAt, eventCreatedAt),
+          notNewer(organizationBilling.lastEventAt, eventCreatedAt),
         ),
       ),
     )

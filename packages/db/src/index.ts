@@ -56,6 +56,8 @@ export {
   notInArray,
   isNull,
   lt,
+  lte,
+  sql,
   ilike,
   exists,
   notExists,

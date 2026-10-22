@@ -94,7 +94,12 @@ export type BillingEvent = BillingEventEnvelope &
         receiptUrl: string | null;
       }
     | { type: "invoice_payment_failed"; providerSubscriptionId: string }
-    | { type: "charge_refunded"; paymentIntentId: string }
+    | {
+        type: "charge_refunded";
+        paymentIntentId: string;
+        /** False for a partial refund — the event fires for those too. */
+        fullyRefunded: boolean;
+      }
     | { type: "charge_dispute_created"; paymentIntentId: string | null }
   );
 

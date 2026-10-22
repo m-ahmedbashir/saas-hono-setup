@@ -10,6 +10,12 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ### Fixed
 
+- **A cancellation could be lost when two subscription events shared a timestamp.** Stripe stamps events to the second, and the out-of-order guard only applied events strictly newer than the last one — so when canceling emitted `subscription.updated` and `.deleted` in the same second and the update landed first, the cancellation was skipped and paid access kept. An event that ends the subscription now wins a same-second tie (a deleted Stripe subscription can never become active again); any other event still doesn't. Found by CodeRabbit.
+- **A new subscription's events were compared with the previous subscription's.** The ordering guard's timestamp wasn't reset when checkout started a new subscription on the same billing row, so the new subscription's early events could be skipped as "older". Checkout now resets it.
+- **Partial refunds were recorded as full refunds.** Stripe sends `charge.refunded` for partial refunds too; invoices now become `partially_refunded` unless Stripe reports the charge fully refunded, and a delayed partial-refund event can't downgrade a full one. Found by CodeRabbit.
+- `packages/shared`'s `apiFetch` (used by both frontends) crashed on a failure body with `error: null` instead of reporting a generic HTTP error, and silently dropped caller headers passed as a `Headers` object or `[name, value]` pairs — both valid `fetch` forms. Found by CodeRabbit.
+- The portal's 404 page sent "Back to Home" to `/dashboard`, which only exists in `apps/admin`. Found by CodeRabbit.
+- `billing-self-service.integration.test.ts`'s setup timed out against a slow shared dev database (~10 sequential sign-up/org round trips in a 10s hook budget); given an explicit 60s budget like its sibling suites.
 - The portal's account menu (Profile / Sign out) crashed the moment it opened, since 0.25.0: Base UI throws when a menu label isn't inside a menu group (`MenuGroupContext is missing`), and the label was placed directly in the menu. Nothing caught it because nothing ever opened the menu in a test. Now wrapped in a `DropdownMenuGroup` — the pattern `apps/admin` already follows — with a test that opens it.
 
 ## [0.27.0] — 2026-10-22

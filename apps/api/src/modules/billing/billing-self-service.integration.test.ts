@@ -142,7 +142,9 @@ beforeAll(async () => {
   const outsiderSolo = await signUp(`billing-self-outsider-solo-${Date.now()}@example.com`);
   outsiderSoloId = outsiderSolo.userId;
   outsiderSoloCookie = outsiderSolo.cookie;
-});
+  // ~10 sequential sign-up/org round trips against the shared remote dev database —
+  // vitest's 10s hook default is too tight when that database is slow.
+}, 60000);
 
 afterAll(async () => {
   if (cleanupPlanIds.length > 0) {

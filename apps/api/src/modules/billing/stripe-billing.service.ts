@@ -221,7 +221,14 @@ export class StripeBillingService implements BillingGateway {
         const paymentIntentId = toId(charge.payment_intent);
         if (!paymentIntentId) return null;
 
-        return { ...envelope, type: "charge_refunded", paymentIntentId };
+        // Stripe fires charge.refunded for partial refunds too; `charge.refunded` is true
+        // only once the whole charge has been refunded.
+        return {
+          ...envelope,
+          type: "charge_refunded",
+          paymentIntentId,
+          fullyRefunded: charge.refunded,
+        };
       }
       case "charge.dispute.created": {
         const dispute = event.data.object as Stripe.Dispute;

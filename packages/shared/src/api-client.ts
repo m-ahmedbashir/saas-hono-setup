@@ -42,21 +42,32 @@ interface ApiSuccessBody<T> {
   data: T;
 }
 
+// Checks the error's shape too, not just that the key exists — a body like
+// { success: false, error: null } would otherwise crash reading .code instead of falling
+// through to the generic HTTP_ERROR below.
 function isFailureBody(body: unknown): body is ApiFailureBody {
-  return (
-    typeof body === "object" &&
-    body !== null &&
-    "success" in body &&
-    (body as { success: unknown }).success === false &&
-    "error" in body
-  );
+  if (typeof body !== "object" || body === null) return false;
+  const { success, error } = body as { success?: unknown; error?: unknown };
+  if (success !== false || typeof error !== "object" || error === null) return false;
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  return typeof code === "string" && typeof message === "string";
+}
+
+// RequestInit headers can be a plain object, a Headers instance, or [name, value] pairs —
+// spreading only works for the first and silently drops the others (e.g. billing's
+// Idempotency-Key). `new Headers()` accepts all three; JSON is the default content type,
+// a caller-supplied one wins.
+function buildHeaders(callerHeaders: HeadersInit | undefined): Headers {
+  const headers = new Headers(callerHeaders);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  return headers;
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
     ...init,
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: buildHeaders(init?.headers),
   });
 
   // A malformed/non-JSON body (e.g. a proxy's raw HTML error page) must not crash this

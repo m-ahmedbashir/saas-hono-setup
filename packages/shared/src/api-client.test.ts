@@ -71,6 +71,43 @@ describe("apiFetch", () => {
     });
   });
 
+  it("treats a failure body with a null or malformed error as an unknown failure, not a crash", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ success: false, error: null }, 500));
+    await expect(apiFetch("/organization")).rejects.toMatchObject({
+      code: "HTTP_ERROR",
+      status: 500,
+    });
+
+    fetchMock.mockResolvedValue(jsonResponse({ success: false, error: "boom" }, 500));
+    await expect(apiFetch("/organization")).rejects.toMatchObject({
+      code: "HTTP_ERROR",
+      status: 500,
+    });
+  });
+
+  // Callers may pass headers as a Headers instance or as [name, value] pairs, both valid
+  // RequestInit forms — e.g. billing's Idempotency-Key must reach the server either way.
+  it("keeps caller headers whatever form they're passed in, alongside the JSON content type", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ success: true, data: null }, 200));
+
+    await apiFetch("/billing", { headers: new Headers({ "Idempotency-Key": "k1" }) });
+    await apiFetch("/billing", { headers: [["Idempotency-Key", "k2"]] });
+    await apiFetch("/billing", { headers: { "Idempotency-Key": "k3" } });
+
+    const sent = fetchMock.mock.calls.map(([, init]) => new Headers((init as RequestInit).headers));
+    expect(sent.map((h) => h.get("Idempotency-Key"))).toEqual(["k1", "k2", "k3"]);
+    expect(sent.every((h) => h.get("Content-Type") === "application/json")).toBe(true);
+  });
+
+  it("lets a caller override the content type", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ success: true, data: null }, 200));
+
+    await apiFetch("/upload", { headers: { "Content-Type": "text/plain" } });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(init.headers).get("Content-Type")).toBe("text/plain");
+  });
+
   it("rejects with an ApiError, not a generic Error, so callers can branch on .code", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse({ success: false, error: { code: "NOT_FOUND", message: "Not found" } }, 404),

@@ -18,7 +18,8 @@ export default function NotFound() {
         <Button onClick={() => router.back()} variant="default" size="lg">
           Go back
         </Button>
-        <Button onClick={() => router.push("/dashboard")} variant="ghost" size="lg">
+        {/* "/" — the portal has no /dashboard (that's apps/admin); its home redirects onward. */}
+        <Button onClick={() => router.push("/")} variant="ghost" size="lg">
           Back to Home
         </Button>
       </div>

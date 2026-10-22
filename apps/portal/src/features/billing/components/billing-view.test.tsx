@@ -60,7 +60,8 @@ function requestsTo(path: string) {
 function sentTo(path: string) {
   return requestsTo(path).map(([, init]) => ({
     body: JSON.parse(String(init?.body)) as unknown,
-    idempotencyKey: (init?.headers as Record<string, string> | undefined)?.["Idempotency-Key"],
+    // Read the way the browser does — headers may be any valid HeadersInit form.
+    idempotencyKey: new Headers(init?.headers).get("Idempotency-Key") ?? undefined,
   }));
 }
 

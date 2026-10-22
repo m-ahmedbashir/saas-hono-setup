@@ -132,6 +132,10 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
     if (!inserted) return;
 
     switch (event.type) {
+      // A checkout starts a *new* subscription on the row, so its event ordering starts
+      // fresh (`lastEventAt: null`): the ordering guard compares a subscription's events
+      // with each other, never with a previous subscription's — otherwise a new
+      // subscription's events could be skipped as "older" than the old one's last event.
       case "checkout_completed":
         if (event.ownerType === "organization") {
           await ensureBillingRow(tx, event.ownerId);
@@ -140,6 +144,7 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
             providerSubscriptionId: event.providerSubscriptionId,
             plan: event.planId,
             subscriptionStatus: "active",
+            lastEventAt: null,
             ...(event.seatQuantity !== null && { seatQuantity: event.seatQuantity }),
           });
         } else {
@@ -149,6 +154,7 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
             providerSubscriptionId: event.providerSubscriptionId,
             plan: event.planId,
             subscriptionStatus: "active",
+            lastEventAt: null,
           });
         }
         break;
@@ -161,12 +167,19 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
       // event matches zero rows instead of overwriting a row a newer event already
       // corrected.
       case "subscription_updated": {
+        const ordering = { endsSubscription: endsSubscription(event) };
         const [updatedOrg, updatedUser] = await Promise.all([
-          updateBillingBySubscriptionId(tx, event.providerSubscriptionId, event.eventCreatedAt, {
-            subscriptionStatus: event.status,
-            seatQuantity: event.seatQuantity,
-            ...(defaultPlans && { plan: defaultPlans.organization }),
-          }),
+          updateBillingBySubscriptionId(
+            tx,
+            event.providerSubscriptionId,
+            event.eventCreatedAt,
+            {
+              subscriptionStatus: event.status,
+              seatQuantity: event.seatQuantity,
+              ...(defaultPlans && { plan: defaultPlans.organization }),
+            },
+            ordering,
+          ),
           updateUserBillingBySubscriptionId(
             tx,
             event.providerSubscriptionId,
@@ -175,6 +188,7 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
               subscriptionStatus: event.status,
               ...(defaultPlans && { plan: defaultPlans.individual }),
             },
+            ordering,
           ),
         ]);
         if (event.status === "past_due") {
@@ -188,16 +202,21 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
         break;
       }
       case "subscription_canceled": {
+        const ordering = { endsSubscription: true };
         const [updatedOrg, updatedUser] = await Promise.all([
-          updateBillingBySubscriptionId(tx, event.providerSubscriptionId, event.eventCreatedAt, {
-            subscriptionStatus: "canceled",
-            plan: defaultPlans!.organization,
-          }),
+          updateBillingBySubscriptionId(
+            tx,
+            event.providerSubscriptionId,
+            event.eventCreatedAt,
+            { subscriptionStatus: "canceled", plan: defaultPlans!.organization },
+            ordering,
+          ),
           updateUserBillingBySubscriptionId(
             tx,
             event.providerSubscriptionId,
             event.eventCreatedAt,
             { subscriptionStatus: "canceled", plan: defaultPlans!.individual },
+            ordering,
           ),
         ]);
         pendingNotification = await buildBillingIssueNotification(
@@ -244,7 +263,9 @@ async function handleBillingEvent(event: BillingEvent): Promise<void> {
         // self-healing condition doesn't read as a production incident in error
         // reporting (apps/api/src/instrument.ts has real Sentry wired in).
         try {
-          await markInvoiceRefunded(tx, event.paymentIntentId);
+          await markInvoiceRefunded(tx, event.paymentIntentId, {
+            fullyRefunded: event.fullyRefunded,
+          });
         } catch (err) {
           console.warn(
             `billing: charge.refunded (payment_intent=${event.paymentIntentId}) arrived before its invoice — will retry`,
