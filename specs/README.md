@@ -34,7 +34,7 @@ detail. In short:
 | [organization-self-serve-plan.md](./organization-self-serve-plan.md)             | Create an organization, org settings, leave, transfer ownership                              | —                                                          |
 | [stripe-customer-portal-plan.md](./stripe-customer-portal-plan.md)               | Stripe-hosted plan changes, card updates, cancel at period end, buy seats                    | —                                                          |
 | [account-security-and-settings-plan.md](./account-security-and-settings-plan.md) | Delete my account, active sessions, change email, production rate limiting                   | Change email needs the email spec; everything else doesn't |
-| [security-upgrades-plan.md](./security-upgrades-plan.md)                         | Patched Next.js/Hono/Drizzle (critical RCE fixes), Better Auth 1.7, production rate limiting | — (**do first**: task 1 is urgent)                         |
+| [security-upgrades-plan.md](./security-upgrades-plan.md)                         | Patched Next.js/Hono/Drizzle (critical RCE fixes), Better Auth 1.7, production rate limiting | **Done** (merged 2026-10-23)                               |
 | [typed-api-client-plan.md](./typed-api-client-plan.md)                           | Developer-facing: one source of API types for both frontends, no hand-written copies         | **Done** — the other specs build on it                     |
 
 **Deliberately not specced yet** (don't build ahead — AGENTS.md's ground rule): audit log, SSO
