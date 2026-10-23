@@ -33,6 +33,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Fails the PR as soon as a high/critical advisory lands in a production dependency.
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
+
       - name: Check formatting
         run: pnpm format:check
 
