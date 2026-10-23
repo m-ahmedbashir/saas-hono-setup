@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./api-client": "./src/api-client.ts",
+    "./api-response": "./src/api-response.ts",
     "./query-client": "./src/query-client.ts",
     "./utils": "./src/utils.ts"
   },
@@ -15,6 +16,7 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
+    "@repo/core": "workspace:*",
     "@tanstack/react-query": "^5.95.2",
     "clsx": "^2.1.1",
     "tailwind-merge": "^3.5.0"

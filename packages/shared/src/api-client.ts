@@ -8,29 +8,11 @@
 // apps/admin and apps/portal (see specs/customer-portal-plan.md's Architecture section) —
 // this wrapper has zero audience-specific logic, unlike auth-client.ts's plugin set.
 
-export type ErrorCode =
-  | "UNAUTHENTICATED"
-  | "FORBIDDEN"
-  | "NOT_FOUND"
-  | "VALIDATION_ERROR"
-  | "PAYLOAD_TOO_LARGE"
-  | "PAYMENT_REQUIRED"
-  | "INTERNAL_ERROR"
-  | "HTTP_ERROR";
+// One ApiError class for both paths while callers migrate to unwrap() (api-response.ts), so
+// `instanceof ApiError` holds whichever produced the error.
+import { ApiError, type ErrorCode } from "./api-response";
 
-export class ApiError extends Error {
-  readonly code: ErrorCode;
-  readonly status: number;
-  readonly details?: unknown;
-
-  constructor(code: ErrorCode, message: string, status: number, details?: unknown) {
-    super(message);
-    this.name = "ApiError";
-    this.code = code;
-    this.status = status;
-    this.details = details;
-  }
-}
+export { ApiError, type ErrorCode };
 
 interface ApiFailureBody {
   success: false;

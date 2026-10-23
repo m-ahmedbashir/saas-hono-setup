@@ -427,6 +427,9 @@ importers:
 
   packages/shared:
     dependencies:
+      '@repo/core':
+        specifier: workspace:*
+        version: link:../core
       '@tanstack/react-query':
         specifier: ^5.95.2
         version: 5.101.4(react@19.2.4)
