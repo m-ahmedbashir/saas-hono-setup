@@ -114,6 +114,24 @@ describe("CreateOrganizationView", () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
+  it("retries only the switch after a failed one, never creating a second organization", async () => {
+    setActiveMock
+      .mockResolvedValueOnce({ data: null, error: { message: "Network error" } })
+      .mockResolvedValueOnce({ data: {}, error: null });
+    renderView();
+    const user = userEvent.setup();
+
+    await submitName("Acme");
+    expect(await screen.findByText("Organization created")).toBeInTheDocument();
+    expect(pushMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /create organization/i }));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/team"));
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(setActiveMock).toHaveBeenLastCalledWith({ organizationId: "org_new" });
+  });
+
   it("doesn't create anything when every slug it tries is taken", async () => {
     checkSlugMock.mockResolvedValue(slugTaken);
     renderView();

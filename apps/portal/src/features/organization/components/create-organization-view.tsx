@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import PageContainer from "@/components/layout/page-container";
@@ -23,14 +24,17 @@ export function CreateOrganizationView() {
   const router = useRouter();
   const create = useMutation({ mutationFn: createOrganization });
   const switchTo = useSwitchOrganization();
+  // Kept once created, so resubmitting after a failed switch retries only the switch —
+  // creating again would make a duplicate org (its slug is taken, so a suffixed one wins).
+  const createdId = useRef<string | null>(null);
 
   const form = useAppForm({
     defaultValues: { name: "" } as CreateOrganizationValues,
     validators: { onSubmit: createOrganizationSchema },
     onSubmit: async ({ value }) => {
       try {
-        const organization = await create.mutateAsync({ name: value.name.trim() });
-        await switchTo.mutateAsync(organization.id);
+        createdId.current ??= (await create.mutateAsync({ name: value.name.trim() })).id;
+        await switchTo.mutateAsync(createdId.current);
         router.push("/team");
       } catch {
         // Surfaced via create.error / switchTo.error below.
