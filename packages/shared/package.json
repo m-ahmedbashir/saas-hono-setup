@@ -1,0 +1,30 @@
+{
+  "name": "@repo/shared",
+  "version": "0.28.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./api-response": "./src/api-response.ts",
+    "./hc-client": "./src/hc-client.ts",
+    "./query-client": "./src/query-client.ts",
+    "./utils": "./src/utils.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@repo/core": "workspace:*",
+    "@tanstack/react-query": "^5.95.2",
+    "clsx": "^2.1.1",
+    "hono": "4.13.13",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.12"
+  }
+}

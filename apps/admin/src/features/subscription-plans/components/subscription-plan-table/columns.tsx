@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Icons } from "@/components/icons";
-import type { SubscriptionPlan } from "../../api/types";
+import type { SubscriptionPlan } from "../../api/service";
 import { ColumnDef } from "@tanstack/react-table";
 import { CellAction } from "./cell-action";
 import { OWNER_TYPE_OPTIONS } from "../../options";

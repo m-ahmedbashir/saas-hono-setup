@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { PlatformOrganizationMember } from "../../../api/types";
+import type { PlatformOrganizationMember } from "../../../api/service";
 
 interface OrganizationMembersTabProps {
   members: PlatformOrganizationMember[];

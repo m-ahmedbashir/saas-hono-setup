@@ -44,17 +44,21 @@ export async function closePool(): Promise<void> {
 export * from "./schema";
 export * from "./organization-profile";
 export * from "./notifications";
+export * from "./pg-errors";
 export {
   eq,
   ne,
   and,
   or,
   count,
+  asc,
   desc,
   inArray,
   notInArray,
   isNull,
   lt,
+  lte,
+  sql,
   ilike,
   exists,
   notExists,

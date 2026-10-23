@@ -3,7 +3,7 @@
 A production-oriented starting point for a multi-tenant SaaS backend: [Hono](https://hono.dev) on the API layer, [Drizzle ORM](https://orm.drizzle.team) on Postgres, and [Better Auth](https://better-auth.com) handling authentication and organizations — wired together in a type-safe pnpm/Turborepo monorepo.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![Node.js >=22](https://img.shields.io/badge/node-%3E%3D22-6DA55F?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Node.js >=22.23.4](https://img.shields.io/badge/node-%3E%3D22.23.4-6DA55F?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![pnpm](https://img.shields.io/badge/pnpm-10.30.3-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
 [![Hono](https://img.shields.io/badge/Hono-E36002?logo=hono&logoColor=white)](https://hono.dev/)
@@ -27,8 +27,8 @@ Most starter templates either skip auth entirely or bolt on something minimal. T
 
 ## Prerequisites
 
-- Node.js ≥ 22
-- pnpm (see `packageManager` in `package.json` for the exact version)
+- Node.js ≥ 22.23.4 (Node 22's latest security release)
+- pnpm (see `packageManager` in `package.json` for the exact version). `pnpm-workspace.yaml` sets `minimumReleaseAge` to 3 days, so pnpm refuses package versions published more recently than that. For an emergency patch, add the package to `minimumReleaseAgeExclude` temporarily, with a comment, and remove it later.
 - A Postgres database — [Neon](https://neon.tech) has a free tier and works well for local development; any Postgres works
 
 ## Getting started
@@ -57,7 +57,7 @@ pnpm db:migrate    # apply them to your database
 # "growth"/"individual_pro"/"starter" won't resolve to any real entitlements:
 pnpm --filter @repo/api seed:subscription-plans
 
-pnpm dev           # boots apps/api on http://localhost:8787
+pnpm dev           # boots every app via Turborepo: apps/api :8787, apps/admin :3000, apps/portal :3002
 ```
 
 Confirm it's up:
@@ -96,18 +96,21 @@ See `.env.example` for the full list with comments. Summary:
 | `STRIPE_WEBHOOK_SECRET`                                     | Signing secret for `/billing/webhook`, from the Stripe CLI or dashboard                                                                                                  |
 | `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_GROWTH`              | Stripe Price IDs backing the organization (seat-based) paid tiers                                                                                                        |
 | `STRIPE_PRICE_INDIVIDUAL_PRO`                               | Stripe Price ID backing the individual (B2C) paid tier                                                                                                                   |
-| `BILLING_CHECKOUT_RETURN_URL`                               | Where Stripe Checkout redirects back to after a session completes/cancels                                                                                                |
+| `BILLING_CHECKOUT_RETURN_URL`                               | Where Stripe Checkout redirects back to after a session completes/cancels — `apps/portal`'s `/billing` page (default `http://localhost:3002/billing`)                    |
 
 `.env.development` / `.env.test` are gitignored — they're for your local machine only. `NODE_ENV` itself is **not** set in any env file; each `apps/api` script sets it directly (`dev` → `development`, `start` → `production`, `test` → `test`) via `cross-env`, so it's always correct regardless of which command runs. Real production secrets should come from your hosting platform's env var injection at deploy time, never from a committed file.
 
 ## Project structure
 
 ```
-apps/api/                  Hono server — the only deployable app right now
+apps/api/                  Hono server — the backend every frontend app talks to
   src/index.ts              entrypoint: middleware chain, route composition, exports AppType for RPC clients
   src/middleware/            injectUserContext (auth), requirePermission (PBAC), requireFeature (plan entitlements)
   src/lib/                   response.ts — the API's success/error envelope
   src/modules/auth/          proxies to Better Auth's own handler
+
+apps/admin/                 Next.js staff back office (platform admin/support) — see apps/admin/AGENTS.md
+apps/portal/                Next.js customer-facing app (B2B org members + B2C individuals) — see specs/customer-portal-plan.md
 
 packages/db/                Drizzle schema + client, owns migrations
   src/schema.ts              table definitions (auth tables are generated, see below)
@@ -116,6 +119,8 @@ packages/db/                Drizzle schema + client, owns migrations
 packages/core/              environment-agnostic domain logic — no Hono, no HTTP
   src/auth/                  Better Auth config + access control (permissions)
   src/errors.ts              AppError + error codes, shared by the whole API
+
+packages/shared/            Cross-app frontend infrastructure (typed hc API client, unwrap, getQueryClient, cn) — not shadcn components, those are vendored per app
 ```
 
 ## Architecture
@@ -125,6 +130,8 @@ The three packages are a light Domain-Driven Design split:
 - **`packages/core`** (Domain) — pure logic: auth configuration, permission definitions, error types. Never imports Hono, never makes a network call. Usable from a script or a test without booting a server.
 - **`packages/db`** (Infrastructure) — Drizzle schema and the Postgres client. Owns migrations.
 - **`apps/api`** (Application) — the delivery layer. Validates requests, calls into Domain/Infrastructure, shapes the response. No business logic lives in a route handler.
+
+The frontends (`apps/portal`, `apps/admin`) take their request/response types straight from `apps/api` — `import type { AppType } from "@repo/api/client-types"` feeds Hono's `hc` client — so there are no hand-written copies of API shapes to drift. Better Auth shapes come from Better Auth's own types the same way.
 
 ### Auth & multi-tenancy
 
@@ -155,7 +162,7 @@ Run from the repo root (fans out via Turborepo) or scoped with `--filter @repo/a
 
 | Script              | What it does                                              |
 | ------------------- | --------------------------------------------------------- |
-| `pnpm dev`          | Start `apps/api` in watch mode                            |
+| `pnpm dev`          | Start every app (fans out via Turborepo)                  |
 | `pnpm build`        | Compile all packages                                      |
 | `pnpm test`         | Run tests                                                 |
 | `pnpm typecheck`    | `tsc --noEmit` across the monorepo                        |
@@ -170,10 +177,19 @@ Run from the repo root (fans out via Turborepo) or scoped with `--filter @repo/a
 
 A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every PR and push to `main`:
 
-1. **Quality gate** — `format:check`, `lint`, `typecheck`, `build`.
+1. **Quality gate** — `pnpm audit --prod --audit-level high` (fails on any high or critical advisory in a production dependency), `format:check`, `lint`, `typecheck`, `build`.
 2. **Test gate** — spins up a Postgres service, runs migrations, then runs `pnpm test`.
 
 To make CI pass, add a repository secret named `BETTER_AUTH_SECRET` (generate with `npx auth secret`). The workflow hardcodes a test-only `STRIPE_WEBHOOK_SECRET` so the webhook signature tests can sign their own payloads; live `STRIPE_SECRET_KEY` and Stripe price IDs are not required — the tests that hit Stripe are skipped when those keys are absent.
+
+`.github/dependabot.yml` turns off routine version-bump PRs but leaves security updates on. Enable **Dependabot security updates** in the repository's settings (Code security) so it opens a PR when an advisory affects a dependency.
+
+## Deployment notes
+
+In production, `apps/api` runs on a Node host with **Cloudflare in front**.
+
+- **The origin must accept traffic only from Cloudflare.** Use Cloudflare Tunnel (no public port), Cloudflare's IP ranges as an allowlist, or authenticated origin pulls. Sign-in, sign-up and password-reset rate limits are keyed on the client IP, which Better Auth reads from `cf-connecting-ip` (`packages/core/src/auth/rate-limit.ts`). Cloudflare always overwrites that header. But if the origin is reachable directly, a client can send its own value and get a fresh rate-limit bucket on every request.
+- Limits: sign-in and password reset 5 per minute per client, sign-up 3 per minute. They're on in production only (`NODE_ENV=production`), and counters live in the database (`rateLimit` table), so they hold across API instances.
 
 The `apps/api/src/modules/billing/` slice is the reference example — read it alongside this. A new feature (say, `widgets`) gets its own slice under `apps/api/src/modules/widgets/`:
 
@@ -186,7 +202,7 @@ If a new table is involved, add it to `packages/db/src/schema.ts`, then `pnpm db
 
 ## Contributing
 
-[`AGENTS.md`](./AGENTS.md) is the full set of engineering conventions for this repo — architecture rules, the DDD/SOLID reasoning behind the package split, the auth model in detail, and the response contract. It was written for AI coding agents working in this repo, but every rule in it applies equally to a human contributor. Read it before opening a PR. [`PROGRESS.md`](./PROGRESS.md) tracks what's actually implemented and verified at any given time, separate from the standing rules.
+Start with [`ARCHITECTURE.md`](./ARCHITECTURE.md) for a bird's-eye view of how the apps and packages fit together, with diagrams of the main flows. [`AGENTS.md`](./AGENTS.md) is the full set of engineering conventions for this repo — architecture rules, the DDD/SOLID reasoning behind the package split, the auth model in detail, and the response contract. It was written for AI coding agents working in this repo, but every rule in it applies equally to a human contributor. Read it before opening a PR. [`PROGRESS.md`](./PROGRESS.md) tracks what's actually implemented and verified at any given time, separate from the standing rules.
 
 ## Changelog
 

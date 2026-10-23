@@ -74,7 +74,12 @@ function checkoutCompletedPayload(eventId: string, subscriptionId: string, creat
         client_reference_id: orgId,
         customer: `cus_test_${eventId}`,
         subscription: subscriptionId,
-        metadata: { ownerType: "organization", ownerId: orgId, planId: "starter" },
+        metadata: {
+          ownerType: "organization",
+          ownerId: orgId,
+          planId: "starter",
+          seatQuantity: "3",
+        },
       },
     },
   });
@@ -96,6 +101,23 @@ function subscriptionUpdatedPayload(
         id: subscriptionId,
         object: "subscription",
         status,
+        items: { data: [{ quantity: 1 }] },
+      },
+    },
+  });
+}
+
+function subscriptionDeletedPayload(eventId: string, subscriptionId: string, createdAt: number) {
+  return JSON.stringify({
+    id: eventId,
+    object: "event",
+    type: "customer.subscription.deleted",
+    created: createdAt,
+    data: {
+      object: {
+        id: subscriptionId,
+        object: "subscription",
+        status: "canceled",
         items: { data: [{ quantity: 1 }] },
       },
     },
@@ -132,7 +154,14 @@ function invoicePaidPayload(
   });
 }
 
-function chargeRefundedPayload(eventId: string, paymentIntentId: string, createdAt: number) {
+// Stripe sends charge.refunded for partial refunds too; `refunded` is true only once the
+// charge is refunded in full.
+function chargeRefundedPayload(
+  eventId: string,
+  paymentIntentId: string,
+  createdAt: number,
+  { fully = true }: { fully?: boolean } = {},
+) {
   return JSON.stringify({
     id: eventId,
     object: "event",
@@ -143,8 +172,9 @@ function chargeRefundedPayload(eventId: string, paymentIntentId: string, created
         id: `ch_test_${eventId}`,
         object: "charge",
         payment_intent: paymentIntentId,
-        amount_refunded: 4900,
-        refunded: true,
+        amount: 4900,
+        amount_refunded: fully ? 4900 : 1000,
+        refunded: fully,
       },
     },
   });
@@ -416,7 +446,189 @@ describe("Out-of-order delivery (Fix 3)", () => {
       tx.select().from(billingTable).where(eq(billingTable.providerSubscriptionId, subscriptionId)),
     );
     expect(finalRow?.subscriptionStatus).toBe("canceled");
+    // A canceled status reached via subscription.updated ends the subscription just the
+    // same as subscription.deleted does — see the "Ending a subscription" block below.
+    expect(finalRow?.plan).toBe("free");
   }, 15000);
+});
+
+// The billing row's `plan` is what entitlements and seat limits resolve from
+// (entitlement.middleware.ts / getOrganizationSeatLimit), so a subscription that has ended
+// must stop granting its paid plan — otherwise canceling keeps paid access forever. Stripe's
+// webhook stays the single writer of that change.
+describe("Ending a subscription", () => {
+  it("customer.subscription.deleted returns the organization to the default plan, keeping the subscription id", async () => {
+    const subscriptionId = `sub_test_ended_${Date.now()}`;
+    cleanupSubscriptionIds.push(subscriptionId);
+    const now = Math.floor(Date.now() / 1000);
+    await sendWebhook(
+      checkoutCompletedPayload(`evt_test_ended_checkout_${Date.now()}`, subscriptionId, now),
+    );
+
+    const [paid] = await withSystemScope((tx) =>
+      tx.select().from(billingTable).where(eq(billingTable.providerSubscriptionId, subscriptionId)),
+    );
+    expect(paid?.plan).toBe("starter");
+    // The seats paid for at checkout — what caps membership while the subscription is live
+    // (billing.service.ts's getOrganizationSeatUsage). Carried in checkout metadata, since
+    // Stripe's checkout.session.completed payload doesn't include line-item quantities.
+    expect(paid?.seatQuantity).toBe(3);
+
+    const res = await sendWebhook(
+      subscriptionDeletedPayload(`evt_test_ended_deleted_${Date.now()}`, subscriptionId, now + 60),
+    );
+    expect(res.status).toBe(200);
+
+    const [ended] = await withSystemScope((tx) =>
+      tx.select().from(billingTable).where(eq(billingTable.providerSubscriptionId, subscriptionId)),
+    );
+    expect(ended?.subscriptionStatus).toBe("canceled");
+    expect(ended?.plan).toBe("free");
+    // Kept, not cleared: a late event for the ended subscription (e.g. its final invoice)
+    // must still resolve to this owner rather than be rejected as unknown.
+    expect(ended?.providerSubscriptionId).toBe(subscriptionId);
+  }, 15000);
+});
+
+// Stripe stamps events to the second, so two events for one subscription can share a
+// timestamp — e.g. canceling immediately emits subscription.updated and .deleted within
+// the same second. The ordering guard must still let the ending event win.
+describe("Same-second event ordering", () => {
+  async function rowFor(subscriptionId: string) {
+    const [row] = await withSystemScope((tx) =>
+      tx.select().from(billingTable).where(eq(billingTable.providerSubscriptionId, subscriptionId)),
+    );
+    return row;
+  }
+
+  it("a cancellation stamped the same second as an already-applied update still ends the subscription", async () => {
+    const subscriptionId = `sub_test_tie_cancel_${Date.now()}`;
+    cleanupSubscriptionIds.push(subscriptionId);
+    const t = Math.floor(Date.now() / 1000);
+    await sendWebhook(
+      checkoutCompletedPayload(`evt_tie_a_checkout_${Date.now()}`, subscriptionId, t),
+    );
+    await sendWebhook(
+      subscriptionUpdatedPayload(
+        `evt_tie_a_updated_${Date.now()}`,
+        subscriptionId,
+        "active",
+        t + 1,
+      ),
+    );
+    await sendWebhook(
+      subscriptionDeletedPayload(`evt_tie_a_deleted_${Date.now()}`, subscriptionId, t + 1),
+    );
+
+    const row = await rowFor(subscriptionId);
+    expect(row?.subscriptionStatus).toBe("canceled");
+    expect(row?.plan).toBe("free");
+  }, 20000);
+
+  it("an update stamped the same second as an already-applied cancellation can't undo it", async () => {
+    const subscriptionId = `sub_test_tie_update_${Date.now()}`;
+    cleanupSubscriptionIds.push(subscriptionId);
+    const t = Math.floor(Date.now() / 1000);
+    await sendWebhook(
+      checkoutCompletedPayload(`evt_tie_b_checkout_${Date.now()}`, subscriptionId, t),
+    );
+    await sendWebhook(
+      subscriptionDeletedPayload(`evt_tie_b_deleted_${Date.now()}`, subscriptionId, t + 1),
+    );
+    await sendWebhook(
+      subscriptionUpdatedPayload(
+        `evt_tie_b_updated_${Date.now()}`,
+        subscriptionId,
+        "active",
+        t + 1,
+      ),
+    );
+
+    const row = await rowFor(subscriptionId);
+    expect(row?.subscriptionStatus).toBe("canceled");
+    expect(row?.plan).toBe("free");
+  }, 20000);
+
+  // A new subscription on the same billing row starts its own event ordering — otherwise
+  // its events are compared with the previous subscription's timestamps and wrongly skipped.
+  it("a new subscription's events aren't compared against the previous subscription's", async () => {
+    const t = Math.floor(Date.now() / 1000);
+    const oldSubscription = `sub_test_old_${Date.now()}`;
+    const newSubscription = `sub_test_new_${Date.now()}`;
+    cleanupSubscriptionIds.push(oldSubscription, newSubscription);
+
+    await sendWebhook(
+      checkoutCompletedPayload(`evt_old_checkout_${Date.now()}`, oldSubscription, t),
+    );
+    // The old subscription's last event carries a later timestamp than the new one's will.
+    await sendWebhook(
+      subscriptionUpdatedPayload(
+        `evt_old_updated_${Date.now()}`,
+        oldSubscription,
+        "active",
+        t + 900,
+      ),
+    );
+    await sendWebhook(
+      checkoutCompletedPayload(`evt_new_checkout_${Date.now()}`, newSubscription, t + 5),
+    );
+    await sendWebhook(
+      subscriptionUpdatedPayload(
+        `evt_new_updated_${Date.now()}`,
+        newSubscription,
+        "past_due",
+        t + 10,
+      ),
+    );
+
+    const row = await rowFor(newSubscription);
+    expect(row?.subscriptionStatus).toBe("past_due");
+  }, 25000);
+});
+
+describe("Partial refunds", () => {
+  it("marks a partial refund as partially refunded, and only a full refund as refunded", async () => {
+    const subscriptionId = `sub_test_partial_${Date.now()}`;
+    cleanupSubscriptionIds.push(subscriptionId);
+    const t = Math.floor(Date.now() / 1000);
+    const paymentIntentId = `pi_test_partial_${Date.now()}`;
+    await sendWebhook(
+      checkoutCompletedPayload(`evt_partial_checkout_${Date.now()}`, subscriptionId, t),
+    );
+    await sendWebhook(
+      invoicePaidPayload(`evt_partial_invoice_${Date.now()}`, subscriptionId, paymentIntentId, t),
+    );
+
+    async function invoiceStatus() {
+      const [row] = await withSystemScope((tx) =>
+        tx
+          .select()
+          .from(invoicesTable)
+          .where(eq(invoicesTable.stripePaymentIntentId, paymentIntentId)),
+      );
+      return row?.status;
+    }
+
+    await sendWebhook(
+      chargeRefundedPayload(`evt_partial_1_${Date.now()}`, paymentIntentId, t + 1, {
+        fully: false,
+      }),
+    );
+    expect(await invoiceStatus()).toBe("partially_refunded");
+
+    await sendWebhook(
+      chargeRefundedPayload(`evt_partial_full_${Date.now()}`, paymentIntentId, t + 2),
+    );
+    expect(await invoiceStatus()).toBe("refunded");
+
+    // A delayed redelivery of the earlier partial refund mustn't downgrade a full refund.
+    await sendWebhook(
+      chargeRefundedPayload(`evt_partial_late_${Date.now()}`, paymentIntentId, t + 1, {
+        fully: false,
+      }),
+    );
+    expect(await invoiceStatus()).toBe("refunded");
+  }, 25000);
 });
 
 describe("Refund-before-invoice race (Fix 4)", () => {

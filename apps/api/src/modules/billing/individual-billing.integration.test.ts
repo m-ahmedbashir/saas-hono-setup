@@ -169,7 +169,41 @@ describe("POST /billing/webhook (individual ownerType)", () => {
         .where(eq(organizationBilling.providerSubscriptionId, subscriptionId)),
     );
     expect(orgRows).toEqual([]);
-  });
+
+    // The subscription ending must stop granting individual_pro — the row returns to the
+    // individual default plan (individual_free, not the organization "free" plan).
+    const deleted = JSON.stringify({
+      id: `evt_test_individual_deleted_${Date.now()}`,
+      object: "event",
+      type: "customer.subscription.deleted",
+      created: Math.floor(Date.now() / 1000) + 60,
+      data: {
+        object: {
+          id: subscriptionId,
+          object: "subscription",
+          status: "canceled",
+          items: { data: [{ quantity: 1 }] },
+        },
+      },
+    });
+    const deletedRes = await fetch(`http://localhost:${PORT}/billing/webhook`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "stripe-signature": signWebhookPayload(deleted),
+      },
+      body: deleted,
+    });
+    expect(deletedRes.status).toBe(200);
+
+    const [ended] = await withSystemScope((tx) =>
+      tx.select().from(individualBillingTable).where(eq(individualBillingTable.userId, userId)),
+    );
+    expect(ended?.subscriptionStatus).toBe("canceled");
+    expect(ended?.plan).toBe("individual_free");
+    // Two signed webhook round trips plus reads against the shared dev DB — vitest's 5s
+    // default is too tight under a full sequential run, same as the other webhook tests.
+  }, 15000);
 });
 
 describe("Row-Level Security on the individual_billing table", () => {

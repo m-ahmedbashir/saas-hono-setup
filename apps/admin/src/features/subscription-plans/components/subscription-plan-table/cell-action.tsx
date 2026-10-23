@@ -8,8 +8,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { resolvePlanEntitlements } from "@repo/core/billing/entitlements";
 import { updateSubscriptionPlanMutation } from "../../api/mutations";
-import type { SubscriptionPlan } from "../../api/types";
+import type { SubscriptionPlan } from "../../api/service";
 import { Icons } from "@/components/icons";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -56,8 +57,9 @@ export function CellAction({ data }: CellActionProps) {
                     description: data.description ?? undefined,
                     seatLimit: data.seatLimit ?? undefined,
                     providerPriceId: data.providerPriceId ?? undefined,
-                    features: data.features,
-                    limits: data.limits,
+                    // Update requires every known key; a plan stored before one existed
+                    // lacks it — fill gaps as the server reads plans (missing => off/0).
+                    ...resolvePlanEntitlements(data),
                     isActive: !data.isActive,
                     isDefault: data.isActive ? false : data.isDefault,
                   },

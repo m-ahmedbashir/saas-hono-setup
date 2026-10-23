@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { getNotifications } from "./service";
-import type { NotificationListFilters } from "./types";
+import type { NotificationListFilters } from "./service";
 
 export const notificationKeys = {
   all: ["notifications"] as const,
@@ -9,7 +9,7 @@ export const notificationKeys = {
 
 export const notificationsQueryOptions = (
   filters: NotificationListFilters = {},
-  headers?: HeadersInit,
+  headers?: Record<string, string>,
 ) =>
   queryOptions({
     queryKey: notificationKeys.list(filters),

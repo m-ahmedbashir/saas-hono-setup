@@ -7,13 +7,7 @@
 // admin section ("a future admin UI calls them directly, same as any other Better Auth
 // endpoint").
 import { authClient } from "@/lib/auth-client";
-import type {
-  CreateEmployeePayload,
-  PlatformRole,
-  PlatformUser,
-  UserFilters,
-  UsersResponse,
-} from "./types";
+import type { CreateEmployeePayload, PlatformRole, PlatformUser, UserFilters } from "./types";
 
 // authClient methods resolve { data, error } — never throw for expected failures, same
 // contract as every other Better Auth client call (see AGENTS.md). Normalized into a
@@ -31,7 +25,7 @@ function unwrap<T>(result: { data: T | null; error: { message?: string } | null 
 export async function getUsers(
   filters: UserFilters,
   headers?: HeadersInit,
-): Promise<UsersResponse> {
+): Promise<{ users: PlatformUser[]; total: number }> {
   const limit = filters.limit ?? 10;
   const offset = ((filters.page ?? 1) - 1) * limit;
 
@@ -71,7 +65,7 @@ export async function getUsers(
   );
 
   const data = unwrap(result);
-  return { users: data.users as unknown as PlatformUser[], total: data.total };
+  return { users: data.users, total: data.total };
 }
 
 export async function createEmployee(payload: CreateEmployeePayload): Promise<PlatformUser> {
@@ -81,7 +75,7 @@ export async function createEmployee(payload: CreateEmployeePayload): Promise<Pl
     password: payload.password,
     role: payload.role,
   });
-  return unwrap(result).user as unknown as PlatformUser;
+  return unwrap(result).user;
 }
 
 export async function setUserRole(userId: string, role: PlatformRole): Promise<void> {

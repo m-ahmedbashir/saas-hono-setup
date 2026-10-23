@@ -6,6 +6,7 @@ import {
   organization as organizationTable,
   user as userTable,
   organizationProfile as organizationProfileTable,
+  ensureOrganizationProfileRow,
   withOrgScope,
   withSystemScope,
 } from "@repo/db";
@@ -201,6 +202,58 @@ describe("PATCH /organization-profile", () => {
     expect(body.data.orgNumber).not.toBe("HACKED00");
   }, 15000);
 });
+
+describe("ensureOrganizationProfileRow under concurrency", () => {
+  // Forces the race deterministically: A inserts the row and holds its commit, so B's first
+  // SELECT misses it and B's INSERT blocks on the organization_id unique index. Once B is
+  // provably waiting on that lock, A commits — B's insert then fails with a unique
+  // violation and must fall back to A's row. Guards the violation detection itself:
+  // drizzle-orm >= 0.44 wraps the pg error in DrizzleQueryError (code on `.cause`), which
+  // silently turned this path into a throw.
+  it("returns the concurrent winner's row instead of throwing on the unique violation", async () => {
+    const owner = await signUp(`org-profile-race-${Date.now()}@example.com`);
+    cleanupUserIds.push(owner.userId);
+    const orgId = await createOrg(owner.cookie, "Race Org");
+    cleanupOrgIds.push(orgId);
+    await withSystemScope((tx) =>
+      tx.delete(organizationProfileTable).where(eq(organizationProfileTable.organizationId, orgId)),
+    );
+
+    let releaseWinner!: () => void;
+    const winnerMayCommit = new Promise<void>((resolve) => (releaseWinner = resolve));
+    let signalInserted!: () => void;
+    const winnerInserted = new Promise<void>((resolve) => (signalInserted = resolve));
+    const winner = withOrgScope(orgId, async (tx) => {
+      const row = await ensureOrganizationProfileRow(tx, orgId);
+      signalInserted();
+      await winnerMayCommit;
+      return row;
+    });
+    await winnerInserted;
+
+    const loser = withOrgScope(orgId, (tx) => ensureOrganizationProfileRow(tx, orgId));
+    try {
+      await waitForInsertBlockedOnLock();
+    } finally {
+      releaseWinner();
+    }
+
+    const [winnerRow, loserRow] = await Promise.all([winner, loser]);
+    expect(loserRow.id).toBe(winnerRow.id);
+  }, 30000);
+});
+
+async function waitForInsertBlockedOnLock() {
+  for (let i = 0; i < 100; i++) {
+    const { rows } = await db.$client.query(
+      `SELECT 1 FROM pg_stat_activity
+       WHERE wait_event_type = 'Lock' AND query LIKE 'insert into "organization_profile"%'`,
+    );
+    if (rows.length > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("the second insert never blocked on the first one's uncommitted row");
+}
 
 describe("Row-Level Security on the organization_profile table", () => {
   it("hides the row from an unscoped query, and from a different org's scope", async () => {

@@ -1,11 +1,11 @@
 {
   "name": "saas-hono-setup",
-  "version": "0.23.0",
+  "version": "0.28.0",
   "private": true,
   "license": "MIT",
   "packageManager": "pnpm@10.30.3",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.23.4"
   },
   "scripts": {
     "dev": "turbo run dev",

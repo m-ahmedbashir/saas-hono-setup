@@ -13,6 +13,12 @@
       "skillPath": "skills/ci-cd-and-automation/SKILL.md",
       "computedHash": "578b098a7d2352ccdac8b8abdc40eb6803538e81cf8382f138da6188a655087c"
     },
+    "code-review": {
+      "source": "coderabbitai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review/SKILL.md",
+      "computedHash": "3e9e785ab5b98285e195b7d0ead9bd60617791b3b898b87e98c20d713cf6b5c5"
+    },
     "context-engineering": {
       "source": "addyosmani/agent-skills",
       "sourceType": "github",

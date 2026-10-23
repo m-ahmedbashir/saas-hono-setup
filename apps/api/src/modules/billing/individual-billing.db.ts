@@ -1,4 +1,4 @@
-import { individualBilling, eq, and, or, isNull, lt, count, type DbExecutor } from "@repo/db";
+import { individualBilling, eq, and, or, isNull, lt, lte, count, type DbExecutor } from "@repo/db";
 import type { IndividualPlanId, SubscriptionStatus } from "@repo/core";
 
 // Mirrors organization-billing.db.ts exactly, scoped by userId instead of
@@ -42,6 +42,7 @@ interface UserBillingUpdate {
   providerCustomerId: string;
   providerSubscriptionId: string;
   subscriptionStatus: SubscriptionStatus;
+  lastEventAt: Date | null;
 }
 
 export async function updateUserBillingByUserId(
@@ -55,14 +56,17 @@ export async function updateUserBillingByUserId(
 /**
  * Same reasoning as organization-billing.db.ts's identical change — returns the updated
  * row (or `null`) so the caller can tell whether this table was the match, and guards on
- * `eventCreatedAt` against out-of-order webhook delivery (Fix 3, see that file's comment).
+ * `eventCreatedAt` against out-of-order webhook delivery (Fix 3), with the same tie-break —
+ * an event that ends the subscription wins a same-second tie. See that file's comment.
  */
 export async function updateUserBillingBySubscriptionId(
   tx: DbExecutor,
   providerSubscriptionId: string,
   eventCreatedAt: Date,
   values: Partial<UserBillingUpdate>,
+  { endsSubscription }: { endsSubscription: boolean },
 ) {
+  const notNewer = endsSubscription ? lte : lt;
   const [updated] = await tx
     .update(individualBilling)
     .set({ ...values, lastEventAt: eventCreatedAt })
@@ -71,7 +75,7 @@ export async function updateUserBillingBySubscriptionId(
         eq(individualBilling.providerSubscriptionId, providerSubscriptionId),
         or(
           isNull(individualBilling.lastEventAt),
-          lt(individualBilling.lastEventAt, eventCreatedAt),
+          notNewer(individualBilling.lastEventAt, eventCreatedAt),
         ),
       ),
     )

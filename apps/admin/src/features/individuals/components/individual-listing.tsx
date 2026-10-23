@@ -1,6 +1,6 @@
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { cookies } from "next/headers";
-import { getQueryClient } from "@/lib/query-client";
+import { getQueryClient } from "@repo/shared/query-client";
 import { searchParamsCache } from "@/lib/searchparams";
 import { platformIndividualsQueryOptions } from "../api/queries";
 import { IndividualsTable } from "./individuals-table";

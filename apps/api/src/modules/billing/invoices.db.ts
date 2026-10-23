@@ -1,4 +1,4 @@
-import { invoices, eq, desc, type AnyExecutor } from "@repo/db";
+import { invoices, eq, desc, sql, type AnyExecutor } from "@repo/db";
 import { AppError } from "@repo/core";
 
 // invoices isn't RLS-enabled either (same system-populated reasoning as billingEvents),
@@ -30,19 +30,30 @@ export async function insertInvoice(tx: AnyExecutor, values: NewInvoice) {
 }
 
 /**
- * Marks the invoice matching `stripePaymentIntentId` as refunded. Throws — doesn't
- * silently no-op — if no row matches, per specs/billing-integrity-plan.md's Fix 4: a
- * `charge.refunded` can legitimately arrive before the `invoice.paid` it belongs to
- * (Stripe delivery isn't ordered), and swallowing "no match" here would permanently lose
- * the refund from this curated table the moment that race happens. The caller
- * (`billing.handlers.ts`) lets this propagate so the whole transaction (ledger insert
- * included) rolls back and Stripe's own retry schedule redelivers the event later, by
- * which point the invoice row normally exists.
+ * Records a refund on the invoice matching `stripePaymentIntentId`: "refunded" for a full
+ * refund, "partially_refunded" otherwise. A full refund is final — a delayed redelivery of
+ * an earlier partial refund (Stripe delivery isn't ordered) never downgrades it, hence the
+ * CASE rather than a plain SET.
+ *
+ * Throws — doesn't silently no-op — if no row matches, per specs/billing-integrity-plan.md's
+ * Fix 4: a `charge.refunded` can legitimately arrive before the `invoice.paid` it belongs to,
+ * and swallowing "no match" here would permanently lose the refund from this curated table
+ * the moment that race happens. The caller (`billing.handlers.ts`) lets this propagate so
+ * the whole transaction (ledger insert included) rolls back and Stripe's own retry schedule
+ * redelivers the event later, by which point the invoice row normally exists.
  */
-export async function markInvoiceRefunded(tx: AnyExecutor, stripePaymentIntentId: string) {
+export async function markInvoiceRefunded(
+  tx: AnyExecutor,
+  stripePaymentIntentId: string,
+  { fullyRefunded }: { fullyRefunded: boolean },
+) {
   const [updated] = await tx
     .update(invoices)
-    .set({ status: "refunded" })
+    .set({
+      status: fullyRefunded
+        ? "refunded"
+        : sql`case when ${invoices.status} = 'refunded' then 'refunded' else 'partially_refunded' end`,
+    })
     .where(eq(invoices.stripePaymentIntentId, stripePaymentIntentId))
     .returning();
 

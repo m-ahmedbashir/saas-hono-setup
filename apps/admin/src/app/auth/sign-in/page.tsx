@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Fraunces } from "next/font/google";
 import { SignInView } from "@/features/auth/components/sign-in-view";
 import { Icons } from "@/components/icons";
-import { cn } from "@/lib/utils";
+import { cn } from "@repo/shared/utils";
 
 // Scoped to this route only — the display serif gives the login screen its own
 // editorial voice without touching the dashboard's Geist-based type system

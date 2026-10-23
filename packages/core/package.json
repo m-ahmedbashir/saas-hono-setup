@@ -1,6 +1,6 @@
 {
   "name": "@repo/core",
-  "version": "0.23.0",
+  "version": "0.28.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -9,7 +9,10 @@
     ".": "./src/index.ts",
     "./auth": "./src/auth/index.ts",
     "./auth/platform-permissions": "./src/auth/platform-permissions.ts",
-    "./billing/entitlements": "./src/billing/entitlements.ts"
+    "./auth/permissions": "./src/auth/permissions.ts",
+    "./billing/entitlements": "./src/billing/entitlements.ts",
+    "./billing/subscription-status": "./src/billing/subscription-status.ts",
+    "./errors": "./src/errors.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -19,12 +22,12 @@
   },
   "dependencies": {
     "@repo/db": "workspace:*",
-    "better-auth": "^1.1.0",
-    "zod": "^4.0.0"
+    "better-auth": "1.7.12",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^2.1.0"
+    "vitest": "^4.1.12"
   }
 }

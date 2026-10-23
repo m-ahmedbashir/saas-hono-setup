@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 import { organizationProfile } from "./schema";
 import { eq } from "drizzle-orm";
 import type { DbExecutor } from "./index";
+import { isUniqueViolation } from "./pg-errors";
 
 // Lives here rather than packages/core (Domain, where a pure generator like this would
 // normally belong) because packages/core already depends on @repo/db (for Better Auth's
@@ -30,10 +31,6 @@ function generateOrgNumber(): string {
     code += ORG_NUMBER_ALPHABET[randomInt(ORG_NUMBER_ALPHABET.length)];
   }
   return code;
-}
-
-function isUniqueViolation(err: unknown): boolean {
-  return typeof err === "object" && err !== null && "code" in err && err.code === "23505";
 }
 
 /**

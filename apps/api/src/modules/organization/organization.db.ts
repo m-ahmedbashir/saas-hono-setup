@@ -1,4 +1,24 @@
-import { organization, organizationBilling, eq, type DbExecutor, type AnyExecutor } from "@repo/db";
+import {
+  organization,
+  organizationBilling,
+  member,
+  eq,
+  count,
+  type DbExecutor,
+  type AnyExecutor,
+} from "@repo/db";
+
+/** Current members of an organization — what checkout's minimum seat count is measured against. `member` isn't RLS-enabled (Better-Auth-generated), hence `AnyExecutor`. */
+export async function countOrganizationMembers(
+  tx: AnyExecutor,
+  organizationId: string,
+): Promise<number> {
+  const [row] = await tx
+    .select({ value: count() })
+    .from(member)
+    .where(eq(member.organizationId, organizationId));
+  return row?.value ?? 0;
+}
 
 export async function getOrganizationSubscriptionId(
   tx: DbExecutor,

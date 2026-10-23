@@ -1,4 +1,4 @@
-import { db, withSystemScope } from "@repo/db";
+import { db, isUniqueViolation, withSystemScope } from "@repo/db";
 import {
   AppError,
   resolvePlanEntitlements,
@@ -14,6 +14,8 @@ import {
   getSubscriptionPlanForBilling,
   getDefaultSharedPlan,
   listOtherActiveSharedPlans,
+  listPlansForScope,
+  applyCustomPlanPrecedence,
   insertSubscriptionPlan,
   updateSubscriptionPlan,
   clearOtherDefaults,
@@ -25,11 +27,6 @@ import type {
   CreateSubscriptionPlanInput,
   UpdateSubscriptionPlanInput,
 } from "./subscription-plans.schema";
-
-function isUniqueViolation(err: unknown, constraintName: string): boolean {
-  const pgErr = err as { code?: string; constraint?: string };
-  return pgErr?.code === "23505" && pgErr?.constraint === constraintName;
-}
 
 async function assertValidPriceId(providerPriceId: string | undefined): Promise<void> {
   if (!providerPriceId) return;
@@ -79,7 +76,7 @@ export async function getPlanWithSubscriberCount(
 }
 
 /**
- * The one function `entitlement.middleware.ts`/`seat-limit.middleware.ts`/
+ * The one function `entitlement.middleware.ts`/`getOrganizationSeatLimit`/
  * `billing.service.ts` all call directly (in-process, no HTTP hop — see
  * specs/subscription-management-plan.md's "Internal resolution never goes through the
  * HTTP route"). Custom-then-shared resolution — see `getSubscriptionPlanForBilling`'s
@@ -93,8 +90,24 @@ export async function getPlanForBilling(
   return getSubscriptionPlanForBilling(db, ownerType, planId, organizationId);
 }
 
+export type PlanOptionRow = Awaited<ReturnType<typeof listPlansForScope>>[number];
+
 /**
- * What `entitlement.middleware.ts`/`seat-limit.middleware.ts` use for an
+ * The plans a customer in this scope can choose from: exactly the rows checkout would
+ * resolve each slug to (the same `applyCustomPlanPrecedence` as `getPlanForBilling`),
+ * then only the active ones. Precedence first, filter second — the other order would let
+ * a retired custom deal stop shadowing the shared plan, offering a plan checkout refuses.
+ */
+export async function listPlanOptions(
+  ownerType: OwnerType,
+  organizationId: string | null,
+): Promise<PlanOptionRow[]> {
+  const rows = await listPlansForScope(db, ownerType, organizationId);
+  return applyCustomPlanPrecedence(rows).filter((r) => r.isActive);
+}
+
+/**
+ * What `entitlement.middleware.ts`/`getOrganizationSeatLimit` use for an
  * organization/user with no billing row at all yet — replaces the old hardcoded
  * `"free"`/`"individual_free"` fallback string, per
  * specs/subscription-management-plan.md's Assumptions section: `isDefault` only means
@@ -107,6 +120,19 @@ export async function getDefaultPlanId(ownerType: OwnerType): Promise<string> {
   const row = await getDefaultSharedPlan(db, ownerType);
   if (row) return row.planId;
   return ownerType === "organization" ? "free" : "individual_free";
+}
+
+/**
+ * Which plan a billing row means right now: its own `plan`, or the default plan when the
+ * owner has no billing row yet (never checked out). The one place this rule lives, so
+ * entitlements (entitlement.middleware.ts) and seat limits (billing.service.ts's
+ * getOrganizationSeatUsage) can never disagree about the same owner's plan.
+ */
+export async function currentPlanId(
+  ownerType: OwnerType,
+  billingRow: { plan: string } | null,
+): Promise<string> {
+  return billingRow?.plan ?? getDefaultPlanId(ownerType);
 }
 
 /**

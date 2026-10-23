@@ -19,8 +19,10 @@ function getStripeClient(): Stripe {
   return new Stripe(key);
 }
 
+// apps/portal's billing page, not apps/admin's — customers start checkout from the
+// portal; apps/admin is staff-only and has no /billing route at all.
 const checkoutReturnUrl =
-  process.env.BILLING_CHECKOUT_RETURN_URL ?? "http://localhost:3000/billing";
+  process.env.BILLING_CHECKOUT_RETURN_URL ?? "http://localhost:3002/billing";
 
 /**
  * Concrete Stripe adapter for the `BillingGateway` contract defined in
@@ -45,7 +47,15 @@ export class StripeBillingService implements BillingGateway {
         line_items: [{ price: providerPriceId, quantity }],
         success_url: `${checkoutReturnUrl}?checkout=success`,
         cancel_url: `${checkoutReturnUrl}?checkout=cancelled`,
-        metadata: { ownerType: "organization", ownerId: orgId, planId },
+        // seatQuantity rides along in metadata (signed, echoed back on the webhook) because
+        // checkout.session.completed doesn't include line-item quantities — and the seats
+        // paid for are what caps the org's membership while the subscription is live.
+        metadata: {
+          ownerType: "organization",
+          ownerId: orgId,
+          planId,
+          seatQuantity: String(quantity),
+        },
       },
       idempotencyKey ? { idempotencyKey } : undefined,
     );
@@ -150,7 +160,12 @@ export class StripeBillingService implements BillingGateway {
           planId,
         };
         if (ownerType === "organization") {
-          return { ...shared, ownerType };
+          const seatQuantity = Number(session.metadata?.seatQuantity);
+          return {
+            ...shared,
+            ownerType,
+            seatQuantity: Number.isInteger(seatQuantity) && seatQuantity > 0 ? seatQuantity : null,
+          };
         }
         if (ownerType === "individual") {
           return { ...shared, ownerType };
@@ -206,7 +221,14 @@ export class StripeBillingService implements BillingGateway {
         const paymentIntentId = toId(charge.payment_intent);
         if (!paymentIntentId) return null;
 
-        return { ...envelope, type: "charge_refunded", paymentIntentId };
+        // Stripe fires charge.refunded for partial refunds too; `charge.refunded` is true
+        // only once the whole charge has been refunded.
+        return {
+          ...envelope,
+          type: "charge_refunded",
+          paymentIntentId,
+          fullyRefunded: charge.refunded,
+        };
       }
       case "charge.dispute.created": {
         const dispute = event.data.object as Stripe.Dispute;
