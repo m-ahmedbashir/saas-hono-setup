@@ -232,8 +232,11 @@ describe("ensureOrganizationProfileRow under concurrency", () => {
     await winnerInserted;
 
     const loser = withOrgScope(orgId, (tx) => ensureOrganizationProfileRow(tx, orgId));
-    await waitForInsertBlockedOnLock();
-    releaseWinner();
+    try {
+      await waitForInsertBlockedOnLock();
+    } finally {
+      releaseWinner();
+    }
 
     const [winnerRow, loserRow] = await Promise.all([winner, loser]);
     expect(loserRow.id).toBe(winnerRow.id);
