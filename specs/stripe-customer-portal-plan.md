@@ -67,6 +67,10 @@ apps/portal/src/features/billing/         "Manage billing" button; "Cancels on <
   `billing:manage` for orgs; ownership for individuals — same as checkout), refuses (422) if
   there's no `providerCustomerId`, and returns `{ url }`. `return_url` is
   `BILLING_CHECKOUT_RETURN_URL` (already the portal's `/billing`).
+- **Portal types come from the API:** the portal's billing service calls the new routes through
+  `api.billing[...]` + `unwrap()`, so `{ url }` and the new `cancelAt` field on the billing views
+  reach the components through `AppType` with nothing hand-written (AGENTS.md). Inline
+  validators, no return-type annotations on the controllers — or the types collapse.
 - **Price → plan, on `subscription.updated`:** look up the plan whose `providerPriceId` matches,
   scoped to the row's owner (org custom plans first, then shared — reuse
   `applyCustomPlanPrecedence`). Found → set `plan`. **Not found → leave `plan` unchanged, log a
@@ -102,7 +106,7 @@ Existing stack, no new dependencies. One migration (`pnpm db:generate` → revie
 `pnpm db:migrate`; adding a nullable column is non-destructive).
 
 ```
-pnpm --filter @repo/api test -- src/modules/billing --no-file-parallelism
+pnpm --filter @repo/api test src/modules/billing
 pnpm --filter @repo/portal test
 stripe listen --forward-to localhost:8787/billing/webhook    # local webhook testing
 ```

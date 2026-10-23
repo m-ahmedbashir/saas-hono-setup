@@ -1,7 +1,7 @@
 import { isLiveSubscription } from "@repo/core/billing/subscription-status";
 import { Badge } from "@/components/ui/badge";
 import { Icons } from "@/components/icons";
-import type { SubscriptionStatus } from "../api/types";
+import type { SubscriptionStatus } from "@repo/core/billing/subscription-status";
 
 type LiveStatus = Exclude<SubscriptionStatus, "canceled">;
 

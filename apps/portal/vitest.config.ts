@@ -13,5 +13,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     globals: true,
+    // src/lib/api.ts needs it, as in every real environment (.env.example).
+    env: { NEXT_PUBLIC_API_URL: "http://localhost:8787" },
   },
 });

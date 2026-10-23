@@ -1,4 +1,4 @@
-import type { PlatformIndividualDetail } from "../../../api/types";
+import type { PlatformIndividualDetail } from "../../../api/service";
 import { DetailField } from "@/components/detail-field";
 
 interface IndividualProfileTabProps {

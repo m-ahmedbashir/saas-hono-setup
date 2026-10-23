@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { getSubscriptionPlans, getSubscriptionPlan } from "./service";
-import type { SubscriptionPlan, SubscriptionPlanFilters } from "./types";
+import type { SubscriptionPlan, SubscriptionPlanFilters } from "./service";
 
 export type { SubscriptionPlan };
 
@@ -13,7 +13,7 @@ export const subscriptionPlanKeys = {
 
 export const subscriptionPlansQueryOptions = (
   filters: SubscriptionPlanFilters,
-  headers?: HeadersInit,
+  headers?: Record<string, string>,
 ) =>
   queryOptions({
     queryKey: subscriptionPlanKeys.list(filters),

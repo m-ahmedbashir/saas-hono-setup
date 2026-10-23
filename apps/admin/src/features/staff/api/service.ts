@@ -12,7 +12,6 @@ import type {
   PlatformRole,
   PlatformStaff,
   PlatformStaffFilters,
-  PlatformStaffResponse,
 } from "./types";
 
 // authClient methods resolve { data, error } — never throw for expected failures, same
@@ -31,7 +30,7 @@ function unwrap<T>(result: { data: T | null; error: { message?: string } | null 
 export async function getStaff(
   filters: PlatformStaffFilters,
   headers?: HeadersInit,
-): Promise<PlatformStaffResponse> {
+): Promise<{ staff: PlatformStaff[]; total: number }> {
   const limit = filters.limit ?? 10;
   const offset = ((filters.page ?? 1) - 1) * limit;
 
@@ -71,7 +70,7 @@ export async function getStaff(
   );
 
   const data = unwrap(result);
-  return { staff: data.users as unknown as PlatformStaff[], total: data.total };
+  return { staff: data.users, total: data.total };
 }
 
 export async function createEmployee(payload: CreateEmployeePayload): Promise<PlatformStaff> {
@@ -81,7 +80,7 @@ export async function createEmployee(payload: CreateEmployeePayload): Promise<Pl
     password: payload.password,
     role: payload.role,
   });
-  return unwrap(result).user as unknown as PlatformStaff;
+  return unwrap(result).user;
 }
 
 export async function setStaffRole(userId: string, role: PlatformRole): Promise<void> {

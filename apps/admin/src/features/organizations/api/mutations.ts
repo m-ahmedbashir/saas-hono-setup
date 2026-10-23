@@ -2,7 +2,7 @@ import { mutationOptions } from "@tanstack/react-query";
 import { getQueryClient } from "@repo/shared/query-client";
 import { createPlatformOrganization, banOrganization, unbanOrganization } from "./service";
 import { platformOrganizationKeys } from "./queries";
-import type { CreatePlatformOrganizationPayload, BanOrganizationPayload } from "./types";
+import type { CreatePlatformOrganizationPayload, BanOrganizationPayload } from "./service";
 
 const invalidatePlatformOrganizations = () => {
   getQueryClient().invalidateQueries({ queryKey: platformOrganizationKeys.all });

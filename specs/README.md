@@ -23,15 +23,19 @@ detail. In short:
 - **API already built but with no customer UI yet:** `DELETE /account`, `DELETE /organization`,
   `GET`/`PATCH /profile` (phone, date of birth, address), `GET`/`PATCH /organization-profile`.
 - **Staff app (`apps/admin`)**, notifications (persist-then-push), RLS, CI.
+- **Typed API client:** both apps call `apps/api` through `hc<AppType>` (`src/lib/api.ts`) +
+  `unwrap()` (`@repo/shared/api-response`); `apiFetch` and every hand-written `types.ts` are gone.
 
 ## The remaining common SaaS basics
 
-| Spec                                                                             | What a user gets                                                           | Depends on                                                 |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| [email-and-account-recovery-plan.md](./email-and-account-recovery-plan.md)       | Forgot/reset password, email verification, invitation emails               | —                                                          |
-| [organization-self-serve-plan.md](./organization-self-serve-plan.md)             | Create an organization, org settings, leave, transfer ownership            | —                                                          |
-| [stripe-customer-portal-plan.md](./stripe-customer-portal-plan.md)               | Stripe-hosted plan changes, card updates, cancel at period end, buy seats  | —                                                          |
-| [account-security-and-settings-plan.md](./account-security-and-settings-plan.md) | Delete my account, active sessions, change email, production rate limiting | Change email needs the email spec; everything else doesn't |
+| Spec                                                                             | What a user gets                                                                             | Depends on                                                 |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [email-and-account-recovery-plan.md](./email-and-account-recovery-plan.md)       | Forgot/reset password, email verification, invitation emails                                 | —                                                          |
+| [organization-self-serve-plan.md](./organization-self-serve-plan.md)             | Create an organization, org settings, leave, transfer ownership                              | —                                                          |
+| [stripe-customer-portal-plan.md](./stripe-customer-portal-plan.md)               | Stripe-hosted plan changes, card updates, cancel at period end, buy seats                    | —                                                          |
+| [account-security-and-settings-plan.md](./account-security-and-settings-plan.md) | Delete my account, active sessions, change email, production rate limiting                   | Change email needs the email spec; everything else doesn't |
+| [security-upgrades-plan.md](./security-upgrades-plan.md)                         | Patched Next.js/Hono/Drizzle (critical RCE fixes), Better Auth 1.7, production rate limiting | — (**do first**: task 1 is urgent)                         |
+| [typed-api-client-plan.md](./typed-api-client-plan.md)                           | Developer-facing: one source of API types for both frontends, no hand-written copies         | **Done** — the other specs build on it                     |
 
 **Deliberately not specced yet** (don't build ahead — AGENTS.md's ground rule): audit log, SSO
 and social login, two-factor auth, API keys, outbound webhooks, customer-facing notifications,
@@ -76,6 +80,12 @@ Known overlap to coordinate:
    implementation in `apps/api`; `.routes.ts` → `.controller.ts` → `.service.ts` → `.db.ts`;
    Zod validation with the envelope hook; `withOrgScope`/`withUserScope` for RLS tables; the
    portal's design-system components (no hand-rolled controls, no raw colours).
+   **Frontends call `apps/api` only through `src/lib/api.ts`'s `api` client + `unwrap()`** —
+   request/response types come from `AppType`, Better Auth types from Better Auth; never write
+   a `types.ts` copy (AGENTS.md). Keep `zValidator` inline in `.routes.ts` and don't annotate a
+   controller's return type, or the frontend's types silently degrade. **Except Better Auth
+   (`/api/auth/**`)**, which goes through each app's `authClient` — its own `{ data, error }`
+   contract, not the `{ success, data }` envelope.
 6. **Small vertical slices.** One task = one working, tested increment. Run the checks after
    each task, not only at the end.
 7. **Review before the PR:** run `/code-review` and `/security-review` on the branch; verify
@@ -96,7 +106,7 @@ Known overlap to coordinate:
   pnpm turbo run lint
   pnpm typecheck
   pnpm turbo run build
-  pnpm --filter @repo/api test -- --no-file-parallelism
+  pnpm --filter @repo/api test
   pnpm --filter @repo/portal test
   pnpm --filter @repo/admin test
   pnpm --filter @repo/core test

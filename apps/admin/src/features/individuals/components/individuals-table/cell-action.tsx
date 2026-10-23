@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { banIndividualMutation, unbanIndividualMutation } from "../../api/mutations";
-import type { PlatformIndividual } from "../../api/types";
+import type { PlatformIndividual } from "../../api/service";
 import { Icons } from "@/components/icons";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";

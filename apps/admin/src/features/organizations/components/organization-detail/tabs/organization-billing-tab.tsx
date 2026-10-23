@@ -1,4 +1,4 @@
-import type { PlatformOrganizationDetail } from "../../../api/types";
+import type { PlatformOrganizationDetail } from "../../../api/service";
 import { DetailField } from "@/components/detail-field";
 import { BillingHistoryTable } from "@/components/billing-history-table";
 

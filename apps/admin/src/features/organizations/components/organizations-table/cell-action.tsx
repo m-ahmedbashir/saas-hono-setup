@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { unbanOrganizationMutation } from "../../api/mutations";
-import type { PlatformOrganization } from "../../api/types";
+import type { PlatformOrganization } from "../../api/service";
 import { Icons } from "@/components/icons";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";

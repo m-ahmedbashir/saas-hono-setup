@@ -13,7 +13,7 @@ export interface OverviewStats {
   activePlansTotal: number;
 }
 
-export async function getOverviewStats(headers: HeadersInit): Promise<OverviewStats> {
+export async function getOverviewStats(headers: Record<string, string>): Promise<OverviewStats> {
   const [staff, organizations, individuals, plans] = await Promise.all([
     getStaff({ page: 1, limit: 1 }, headers),
     getPlatformOrganizations({ page: 1, limit: 1 }, headers),
@@ -26,7 +26,7 @@ export async function getOverviewStats(headers: HeadersInit): Promise<OverviewSt
     organizationsTotal: organizations.total,
     individualsTotal: individuals.total,
     // No `.total` on the plans response — it's the whole (unpaginated) list already,
-    // see subscription-plans/api/types.ts.
+    // see subscription-plans/api/service.ts.
     activePlansTotal: plans.plans.length,
   };
 }
@@ -36,14 +36,18 @@ export interface RecentSignup {
   type: "organization" | "individual";
   name: string;
   email: string | null;
-  createdAt: Date;
+  // ISO string, as the list endpoints send it over JSON.
+  createdAt: string;
   href: string;
 }
 
 // Latest orgs + individuals merged by createdAt — both list endpoints already sort
 // newest-first, so this is just two small fetches and a client-side sort, not a new
 // aggregate endpoint.
-export async function getRecentSignups(headers: HeadersInit, limit = 5): Promise<RecentSignup[]> {
+export async function getRecentSignups(
+  headers: Record<string, string>,
+  limit = 5,
+): Promise<RecentSignup[]> {
   const [organizations, individuals] = await Promise.all([
     getPlatformOrganizations({ page: 1, limit }, headers),
     getPlatformIndividuals({ page: 1, limit }, headers),

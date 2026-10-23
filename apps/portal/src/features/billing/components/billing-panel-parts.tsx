@@ -1,5 +1,5 @@
 import { isLiveSubscription } from "@repo/core/billing/subscription-status";
-import type { SubscriptionStatus } from "../api/types";
+import type { SubscriptionStatus } from "@repo/core/billing/subscription-status";
 
 const CONFIRMATION_POLL_MS = 2_000;
 const CONFIRMATION_TIMEOUT_MS = 60_000;

@@ -60,8 +60,12 @@ export async function getPlatformStaffUserIds(): Promise<string[]> {
   return rows.map((row) => row.id);
 }
 
+// The REST shape is the stored row (`read` included), not core's NotificationRecord — that
+// type only declares what a NotificationChannel needs to deliver one.
+type StoredNotification = Awaited<ReturnType<typeof listNotificationsByUser>>[number];
+
 export interface ListNotificationsResult {
-  notifications: NotificationRecord[];
+  notifications: StoredNotification[];
   total: number;
   unreadCount: number;
 }
@@ -83,7 +87,7 @@ export async function listMyNotifications(
 export async function markMyNotificationAsRead(
   userId: string,
   id: string,
-): Promise<NotificationRecord | null> {
+): Promise<StoredNotification | null> {
   return withUserScope(userId, (tx) => markNotificationRead(tx, userId, id));
 }
 

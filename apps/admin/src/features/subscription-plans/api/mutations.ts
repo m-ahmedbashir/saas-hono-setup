@@ -2,7 +2,7 @@ import { mutationOptions } from "@tanstack/react-query";
 import { getQueryClient } from "@repo/shared/query-client";
 import { createSubscriptionPlan, updateSubscriptionPlan } from "./service";
 import { subscriptionPlanKeys } from "./queries";
-import type { CreateSubscriptionPlanPayload, UpdateSubscriptionPlanPayload } from "./types";
+import type { CreateSubscriptionPlanPayload, UpdateSubscriptionPlanPayload } from "./service";
 
 const invalidateSubscriptionPlans = () => {
   getQueryClient().invalidateQueries({ queryKey: subscriptionPlanKeys.all });

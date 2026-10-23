@@ -11,7 +11,8 @@
     "./auth/platform-permissions": "./src/auth/platform-permissions.ts",
     "./auth/permissions": "./src/auth/permissions.ts",
     "./billing/entitlements": "./src/billing/entitlements.ts",
-    "./billing/subscription-status": "./src/billing/subscription-status.ts"
+    "./billing/subscription-status": "./src/billing/subscription-status.ts",
+    "./errors": "./src/errors.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

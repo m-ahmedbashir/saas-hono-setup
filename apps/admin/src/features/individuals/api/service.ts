@@ -1,37 +1,63 @@
-import { apiFetch } from "@repo/shared/api-client";
+import { unwrap } from "@repo/shared/api-response";
+import { api } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
-import type {
-  PlatformIndividualFilters,
-  PlatformIndividualsResponse,
-  PlatformIndividualDetail,
-} from "./types";
 
+// Backed by apps/api's /platform-individuals route — the complement of the platform Users
+// (staff) page: every account that ISN'T admin/support (specs/platform-individuals.md).
+// Every apps/api request/response type here is derived from its routes (AppType), never
+// hand-written; ban/unban below are Better Auth calls with no data to type.
+const individuals = api["platform-individuals"];
+
+export type PlatformIndividualFilters = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  // Comma-separated when multiple facet values are picked — apps/api's
+  // platform-individuals.schema.ts splits on "," before validating each member.
+  plan?: string;
+  subscriptionStatus?: string;
+  hasOrganization?: boolean;
+};
+
+// `headers` only for server-side prefetches forwarding the incoming request's cookie.
 export async function getPlatformIndividuals(
   filters: PlatformIndividualFilters,
-  headers?: HeadersInit,
-): Promise<PlatformIndividualsResponse> {
-  const params = new URLSearchParams();
-  if (filters.page) params.set("page", String(filters.page));
-  if (filters.limit) params.set("limit", String(filters.limit));
-  if (filters.search) params.set("search", filters.search);
-  if (filters.plan) params.set("plan", filters.plan);
-  if (filters.subscriptionStatus) params.set("subscriptionStatus", filters.subscriptionStatus);
-  if (filters.hasOrganization !== undefined) {
-    params.set("hasOrganization", String(filters.hasOrganization));
-  }
-  const query = params.toString();
-
-  return apiFetch<PlatformIndividualsResponse>(`/platform-individuals${query ? `?${query}` : ""}`, {
-    headers,
-  });
+  headers?: Record<string, string>,
+) {
+  return unwrap(
+    await individuals.$get(
+      {
+        query: {
+          page: filters.page ? String(filters.page) : undefined,
+          limit: filters.limit ? String(filters.limit) : undefined,
+          search: filters.search || undefined,
+          plan: filters.plan || undefined,
+          subscriptionStatus: filters.subscriptionStatus || undefined,
+          hasOrganization:
+            filters.hasOrganization === undefined
+              ? undefined
+              : filters.hasOrganization
+                ? "true"
+                : "false",
+        },
+      },
+      { headers },
+    ),
+  );
 }
 
 export async function getPlatformIndividualDetail(
   userId: string,
-  headers?: HeadersInit,
-): Promise<PlatformIndividualDetail> {
-  return apiFetch<PlatformIndividualDetail>(`/platform-individuals/${userId}`, { headers });
+  headers?: Record<string, string>,
+) {
+  return unwrap(await individuals[":userId"].$get({ param: { userId } }, { headers }));
 }
+
+export type PlatformIndividual = Awaited<
+  ReturnType<typeof getPlatformIndividuals>
+>["individuals"][number];
+export type PlatformIndividualDetail = Awaited<ReturnType<typeof getPlatformIndividualDetail>>;
+export type PlatformIndividualOrganization = PlatformIndividualDetail["organizations"][number];
 
 // Real Better Auth ban/unban — authClient.admin.* directly, no apps/api route. Better
 // Auth's admin plugin already works on any user id regardless of role (immediately
@@ -39,7 +65,7 @@ export async function getPlatformIndividualDetail(
 // nothing custom to build here — same call the existing Users (staff) table's row
 // action already makes. Unlike platform-organizations' ban, this is real enforcement
 // from day one, not a flag.
-function unwrap<T>(result: { data: T | null; error: { message?: string } | null }): T {
+function unwrapAuthResult<T>(result: { data: T | null; error: { message?: string } | null }): T {
   if (result.error) {
     throw new Error(result.error.message ?? "Request failed");
   }
@@ -51,10 +77,10 @@ function unwrap<T>(result: { data: T | null; error: { message?: string } | null 
 
 export async function banIndividual(userId: string, banReason?: string): Promise<void> {
   const result = await authClient.admin.banUser({ userId, banReason });
-  unwrap(result);
+  unwrapAuthResult(result);
 }
 
 export async function unbanIndividual(userId: string): Promise<void> {
   const result = await authClient.admin.unbanUser({ userId });
-  unwrap(result);
+  unwrapAuthResult(result);
 }

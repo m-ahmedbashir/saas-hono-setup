@@ -127,7 +127,7 @@ packages/core/              environment-agnostic domain logic — no Hono, no HT
   src/auth/                  Better Auth config + access control (permissions)
   src/errors.ts              AppError + error codes, shared by the whole API
 
-packages/shared/            Cross-app frontend infrastructure (apiFetch, getQueryClient, cn) — not shadcn components, those are vendored per app
+packages/shared/            Cross-app frontend infrastructure (typed hc API client, unwrap, getQueryClient, cn) — not shadcn components, those are vendored per app
 ```
 
 ## Architecture
@@ -137,6 +137,8 @@ The three packages are a light Domain-Driven Design split:
 - **`packages/core`** (Domain) — pure logic: auth configuration, permission definitions, error types. Never imports Hono, never makes a network call. Usable from a script or a test without booting a server.
 - **`packages/db`** (Infrastructure) — Drizzle schema and the Postgres client. Owns migrations.
 - **`apps/api`** (Application) — the delivery layer. Validates requests, calls into Domain/Infrastructure, shapes the response. No business logic lives in a route handler.
+
+The frontends (`apps/portal`, `apps/admin`) take their request/response types straight from `apps/api` — `import type { AppType } from "@repo/api/client-types"` feeds Hono's `hc` client — so there are no hand-written copies of API shapes to drift. Better Auth shapes come from Better Auth's own types the same way.
 
 ### Auth & multi-tenancy
 
