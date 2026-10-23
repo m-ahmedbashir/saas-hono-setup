@@ -86,6 +86,16 @@ describe("proxy", () => {
     expect(response?.headers.get("location")).toBeNull();
   });
 
+  // Verifying signs the user in, so the verify link lands here with a fresh session.
+  it("lets an authenticated user reach /auth/email-verified", () => {
+    getSessionCookieMock.mockReturnValue("session-token-value");
+    const request = new NextRequest("http://localhost:3002/auth/email-verified");
+
+    const response = proxy(request);
+
+    expect(response?.headers.get("location")).toBeNull();
+  });
+
   it("still sends a signed-in user away from /auth/forgot-password", () => {
     getSessionCookieMock.mockReturnValue("session-token-value");
     const request = new NextRequest("http://localhost:3002/auth/forgot-password");
