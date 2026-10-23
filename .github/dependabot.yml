@@ -1,0 +1,9 @@
+version: 2
+updates:
+  # Security updates only: a limit of 0 turns off routine version-bump PRs, while
+  # Dependabot security updates (enabled in the repo's settings) still open PRs.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
