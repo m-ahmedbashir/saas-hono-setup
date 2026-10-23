@@ -154,12 +154,20 @@ export const invitation = pgTable(
 
 // Generated (rateLimit storage: "database"). Not RLS-protected: Better Auth reads and
 // writes it internally on every limited request, like the other generated tables.
-export const rateLimit = pgTable("rate_limit", {
-  id: text("id").primaryKey(),
-  key: text("key").notNull().unique(),
-  count: integer("count").notNull(),
-  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
-});
+// The last_request index is the one non-generated addition — keep it when regenerating.
+// Every window reset runs Better Auth's `deleteMany(lastRequest < cutoff)` cleanup, which
+// a plain Node server awaits inside the request (1.7.12 rate-limiter's
+// runInBackgroundOrAwait), so it must not scan the table.
+export const rateLimit = pgTable(
+  "rate_limit",
+  {
+    id: text("id").primaryKey(),
+    key: text("key").notNull().unique(),
+    count: integer("count").notNull(),
+    lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+  },
+  (table) => [index("rate_limit_last_request_idx").on(table.lastRequest)],
+);
 
 // Not a Better Auth-generated table (unlike the ones above) — hand-written and
 // migrated normally via drizzle-kit. FK'd to `organization.id` rather than adding
