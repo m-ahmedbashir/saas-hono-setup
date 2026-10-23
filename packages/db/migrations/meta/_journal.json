@@ -148,6 +148,20 @@
       "when": 1792618780798,
       "tag": "0020_reset_ended_subscription_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792752479530,
+      "tag": "0021_fine_quasar",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792753034187,
+      "tag": "0022_cool_nightcrawler",
+      "breakpoints": true
     }
   ]
 }
