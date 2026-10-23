@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { PlatformIndividualOrganization } from "../../../api/types";
+import type { PlatformIndividualOrganization } from "../../../api/service";
 
 interface IndividualOrganizationsTabProps {
   organizations: PlatformIndividualOrganization[];

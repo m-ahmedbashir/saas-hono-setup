@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { getPlatformIndividuals, getPlatformIndividualDetail } from "./service";
-import type { PlatformIndividual, PlatformIndividualFilters } from "./types";
+import type { PlatformIndividual, PlatformIndividualFilters } from "./service";
 
 export type { PlatformIndividual };
 
@@ -13,14 +13,17 @@ export const platformIndividualKeys = {
 
 export const platformIndividualsQueryOptions = (
   filters: PlatformIndividualFilters,
-  headers?: HeadersInit,
+  headers?: Record<string, string>,
 ) =>
   queryOptions({
     queryKey: platformIndividualKeys.list(filters),
     queryFn: () => getPlatformIndividuals(filters, headers),
   });
 
-export const platformIndividualDetailQueryOptions = (userId: string, headers?: HeadersInit) =>
+export const platformIndividualDetailQueryOptions = (
+  userId: string,
+  headers?: Record<string, string>,
+) =>
   queryOptions({
     queryKey: platformIndividualKeys.detail(userId),
     queryFn: () => getPlatformIndividualDetail(userId, headers),
