@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./api-client": "./src/api-client.ts",
     "./api-response": "./src/api-response.ts",
     "./hc-client": "./src/hc-client.ts",
     "./query-client": "./src/query-client.ts",
