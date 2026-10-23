@@ -1,0 +1,19 @@
+# Local test database for apps/api's integration tests — the same postgres:16 CI uses, so
+# tests stop crossing the network to the shared dev database (and stop writing into it).
+# Data lives in tmpfs: fast, and every `pnpm test:db` starts from an empty database.
+services:
+  test-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: saas_test
+    ports:
+      - "55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d saas_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30

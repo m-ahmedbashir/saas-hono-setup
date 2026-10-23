@@ -15,7 +15,9 @@
     "create-app-role": "node --env-file=../../.env.development scripts/create-app-role.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "migrate:test": "node --env-file=../../.env.development --env-file=../../.env.test node_modules/drizzle-kit/bin.cjs migrate",
+    "create-app-role:test": "node --env-file=../../.env.development --env-file=../../.env.test scripts/create-app-role.js"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
