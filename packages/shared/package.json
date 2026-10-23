@@ -6,6 +6,7 @@
   "exports": {
     "./api-client": "./src/api-client.ts",
     "./api-response": "./src/api-response.ts",
+    "./hc-client": "./src/hc-client.ts",
     "./query-client": "./src/query-client.ts",
     "./utils": "./src/utils.ts"
   },
@@ -19,6 +20,7 @@
     "@repo/core": "workspace:*",
     "@tanstack/react-query": "^5.95.2",
     "clsx": "^2.1.1",
+    "hono": "4.12.30",
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {

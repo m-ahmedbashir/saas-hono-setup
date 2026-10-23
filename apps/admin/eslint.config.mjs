@@ -41,6 +41,19 @@ export default tseslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-explicit-any": "warn",
+      // apps/api is a server: the browser may borrow its types (AppType), never its code.
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@repo/api", "@repo/api/*"],
+              allowTypeImports: true,
+              message: "Use `import type` — apps/api's runtime code must not reach the browser.",
+            },
+          ],
+        },
+      ],
     },
   },
   {
