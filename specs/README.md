@@ -30,7 +30,7 @@ detail. In short:
 
 | Spec                                                                             | What a user gets                                                                             | Depends on                                                 |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| [email-and-account-recovery-plan.md](./email-and-account-recovery-plan.md)       | Forgot/reset password, email verification, invitation emails                                 | —                                                          |
+| [email-and-account-recovery-plan.md](./email-and-account-recovery-plan.md)       | Forgot/reset password, email verification, invitation emails                                 | **Done** (merged 2026-10-24)                               |
 | [organization-self-serve-plan.md](./organization-self-serve-plan.md)             | Create an organization, org settings, leave, transfer ownership                              | —                                                          |
 | [stripe-customer-portal-plan.md](./stripe-customer-portal-plan.md)               | Stripe-hosted plan changes, card updates, cancel at period end, buy seats                    | —                                                          |
 | [account-security-and-settings-plan.md](./account-security-and-settings-plan.md) | Delete my account, active sessions, change email, production rate limiting                   | Change email needs the email spec; everything else doesn't |
