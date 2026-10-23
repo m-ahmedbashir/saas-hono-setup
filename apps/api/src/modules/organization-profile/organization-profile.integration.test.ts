@@ -204,7 +204,14 @@ describe("PATCH /organization-profile", () => {
 
   // z.string().url() alone accepts "javascript:alert(1)" — and the website is rendered as a
   // link (apps/admin, apps/portal), so anything but http(s) must be refused at the boundary.
-  it.each(["javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "ftp://example.com"])(
+  // The last case passes zod's url() (which trims) but isn't parseable as-is — it must be a
+  // 422, not a 500 from new URL() throwing inside the refine.
+  it.each([
+    "javascript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "ftp://example.com",
+    " javascript:alert(1)",
+  ])(
     "refuses a non-http(s) website (%s) with 422 and leaves the profile unchanged",
     async (website) => {
       const owner = await signUp(`org-profile-scheme-${Date.now()}@example.com`);
