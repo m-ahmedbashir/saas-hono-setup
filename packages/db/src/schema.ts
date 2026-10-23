@@ -5,6 +5,7 @@ import {
   timestamp,
   boolean,
   integer,
+  bigint,
   date,
   jsonb,
   index,
@@ -150,6 +151,15 @@ export const invitation = pgTable(
     index("invitation_email_idx").on(table.email),
   ],
 );
+
+// Generated (rateLimit storage: "database"). Not RLS-protected: Better Auth reads and
+// writes it internally on every limited request, like the other generated tables.
+export const rateLimit = pgTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+});
 
 // Not a Better Auth-generated table (unlike the ones above) — hand-written and
 // migrated normally via drizzle-kit. FK'd to `organization.id` rather than adding

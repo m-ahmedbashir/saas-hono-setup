@@ -6,6 +6,7 @@ import * as schema from "@repo/db/schema";
 import { accessControl, roles } from "./permissions";
 import { platformAccessControl, platformRoles } from "./platform-permissions";
 import { resolveSeatUsage } from "./membership-limit";
+import { ipAddressOptions, rateLimitOptions } from "./rate-limit";
 
 export { statement, roles } from "./permissions";
 export {
@@ -34,52 +35,64 @@ const adminUserIds = (process.env.ADMIN_USER_IDS ?? "")
   .map((id) => id.trim())
   .filter(Boolean);
 
-export const auth = betterAuth({
-  database: drizzleAdapter(db, { provider: "pg", schema }),
-  secret: process.env.BETTER_AUTH_SECRET,
-  baseURL: process.env.BETTER_AUTH_URL,
-  trustedOrigins: (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000").split(","),
-  emailAndPassword: {
-    enabled: true,
-  },
-  plugins: [
-    organization({
-      ac: accessControl,
-      roles,
-      // Seat limits, from apps/api via membership-limit.ts. membershipLimit is the hard
-      // stop — Better Auth checks it on every accepted invitation and every addMember
-      // (verified in the installed crud-invites.mjs/crud-members.mjs), so no path to
-      // joining skips it. invitationLimit caps *pending* invitations at the free seats, so
-      // a full org is told at invite time rather than the invitee being refused at accept.
-      membershipLimit: async (_user, joiningOrganization) =>
-        (await resolveSeatUsage(joiningOrganization.id)).limit,
-      invitationLimit: async ({ organization: invitingOrganization }) => {
-        const { limit, members } = await resolveSeatUsage(invitingOrganization.id);
-        return Math.max(limit - members, 0);
-      },
-      // A second instance of this file's one documented DIP exception (importing `db`
-      // for the adapter above) — Better Auth's hook API can only be wired here, inside
-      // the same betterAuth() config, so the organization_profile row (specifically its
-      // orgNumber) can be created immediately rather than lazily. See AGENTS.md's
-      // Organization Profile section. Failure here would otherwise silently swallow the
-      // org creation response's success — let it propagate; it's a real bug to see.
-      organizationHooks: {
-        afterCreateOrganization: async ({ organization: createdOrganization }) => {
-          await withOrgScope(createdOrganization.id, (tx) =>
-            ensureOrganizationProfileRow(tx, createdOrganization.id),
-          );
+/**
+ * The one place a Better Auth instance is configured. `auth` below is the app's instance;
+ * the factory exists so a test can build more instances from the identical config, e.g.
+ * the rate-limit test, which needs limiting on outside production and two instances
+ * sharing one database. Production code uses `auth`, never another instance.
+ */
+export function createAuth(overrides: { rateLimitEnabled?: boolean } = {}) {
+  return betterAuth({
+    database: drizzleAdapter(db, { provider: "pg", schema }),
+    secret: process.env.BETTER_AUTH_SECRET,
+    baseURL: process.env.BETTER_AUTH_URL,
+    trustedOrigins: (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000").split(","),
+    emailAndPassword: {
+      enabled: true,
+    },
+    rateLimit: { ...rateLimitOptions, enabled: overrides.rateLimitEnabled },
+    advanced: { ipAddress: ipAddressOptions },
+    plugins: [
+      organization({
+        ac: accessControl,
+        roles,
+        // Seat limits, from apps/api via membership-limit.ts. membershipLimit is the hard
+        // stop — Better Auth checks it on every accepted invitation and every addMember
+        // (verified in the installed crud-invites.mjs/crud-members.mjs), so no path to
+        // joining skips it. invitationLimit caps *pending* invitations at the free seats, so
+        // a full org is told at invite time rather than the invitee being refused at accept.
+        membershipLimit: async (_user, joiningOrganization) =>
+          (await resolveSeatUsage(joiningOrganization.id)).limit,
+        invitationLimit: async ({ organization: invitingOrganization }) => {
+          const { limit, members } = await resolveSeatUsage(invitingOrganization.id);
+          return Math.max(limit - members, 0);
         },
-      },
-    }),
-    // Platform-wide operator access (list/ban/impersonate/etc. any user, any org) — a
-    // separate concept from the organization plugin's roles above, not a conflicting one:
-    // this reads/writes `user.role` (one flag on the account itself), the organization
-    // plugin reads/writes `member.role` (per-org-membership). Same role *name* ("admin")
-    // can exist in both without collision since they're different columns entirely.
-    // `roles`/`ac` are custom (platform-permissions.ts) — two tiers, `admin` (full access,
-    // matches Better Auth's own built-in default admin role exactly, verified against its
-    // source, so no existing admin silently loses capabilities) and `support`
-    // (list/get only). See AGENTS.md's Platform admin section.
-    admin({ adminUserIds, roles: platformRoles, ac: platformAccessControl }),
-  ],
-});
+        // A second instance of this file's one documented DIP exception (importing `db`
+        // for the adapter above) — Better Auth's hook API can only be wired here, inside
+        // the same betterAuth() config, so the organization_profile row (specifically its
+        // orgNumber) can be created immediately rather than lazily. See AGENTS.md's
+        // Organization Profile section. Failure here would otherwise silently swallow the
+        // org creation response's success — let it propagate; it's a real bug to see.
+        organizationHooks: {
+          afterCreateOrganization: async ({ organization: createdOrganization }) => {
+            await withOrgScope(createdOrganization.id, (tx) =>
+              ensureOrganizationProfileRow(tx, createdOrganization.id),
+            );
+          },
+        },
+      }),
+      // Platform-wide operator access (list/ban/impersonate/etc. any user, any org) — a
+      // separate concept from the organization plugin's roles above, not a conflicting one:
+      // this reads/writes `user.role` (one flag on the account itself), the organization
+      // plugin reads/writes `member.role` (per-org-membership). Same role *name* ("admin")
+      // can exist in both without collision since they're different columns entirely.
+      // `roles`/`ac` are custom (platform-permissions.ts) — two tiers, `admin` (full access,
+      // matches Better Auth's own built-in default admin role exactly, verified against its
+      // source, so no existing admin silently loses capabilities) and `support`
+      // (list/get only). See AGENTS.md's Platform admin section.
+      admin({ adminUserIds, roles: platformRoles, ac: platformAccessControl }),
+    ],
+  });
+}
+
+export const auth = createAuth();
