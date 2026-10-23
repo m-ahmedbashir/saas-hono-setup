@@ -1,3 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Refuse package versions published less than 3 days ago (in minutes): a hijacked
+# maintainer account's malicious release is usually caught and pulled within days.
+minimumReleaseAge: 4320
