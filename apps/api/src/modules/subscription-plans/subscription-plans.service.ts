@@ -1,4 +1,4 @@
-import { db, withSystemScope } from "@repo/db";
+import { db, isUniqueViolation, withSystemScope } from "@repo/db";
 import {
   AppError,
   resolvePlanEntitlements,
@@ -27,11 +27,6 @@ import type {
   CreateSubscriptionPlanInput,
   UpdateSubscriptionPlanInput,
 } from "./subscription-plans.schema";
-
-function isUniqueViolation(err: unknown, constraintName: string): boolean {
-  const pgErr = err as { code?: string; constraint?: string };
-  return pgErr?.code === "23505" && pgErr?.constraint === constraintName;
-}
 
 async function assertValidPriceId(providerPriceId: string | undefined): Promise<void> {
   if (!providerPriceId) return;
