@@ -3,7 +3,12 @@ updates:
   # Security updates only: a limit of 0 turns off routine version-bump PRs, while
   # Dependabot security updates (enabled in the repo's settings) still open PRs.
   - package-ecosystem: npm
-    directory: "/"
+    # Security updates only apply where these match a manifest's location, so list every
+    # workspace (pnpm-workspace.yaml's globs), not just the root.
+    directories:
+      - "/"
+      - "/apps/*"
+      - "/packages/*"
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
