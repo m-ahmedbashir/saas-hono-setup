@@ -9,7 +9,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { notificationsQueryOptions } from "../api/queries";
 import { markNotificationReadMutation, markAllNotificationsReadMutation } from "../api/mutations";
-import type { Notification } from "../api/types";
+import type { Notification } from "../api/service";
 
 const PAGE_LIMIT = 50;
 

@@ -63,3 +63,16 @@ describe("AppType (hc client) — billing routes", () => {
     >().toEqualTypeOf<{ plan: number; subscriptionStatus: null; seatQuantity: null }>();
   });
 });
+
+// The list/mark-read routes return full notification rows, `read` included — the declared
+// type must say so, or the admin UI's read/unread state has no typed source.
+describe("AppType (hc client) — notifications routes", () => {
+  it("declares the read flag every returned notification carries", () => {
+    type Listed = InferResponseType<Client["notifications"]["$get"], 200>["data"];
+    expectTypeOf<Listed["notifications"][number]>().toHaveProperty("read").toEqualTypeOf<boolean>();
+    expectTypeOf<Listed>().toHaveProperty("unreadCount").toEqualTypeOf<number>();
+
+    type Marked = InferResponseType<Client["notifications"][":id"]["read"]["$patch"], 200>["data"];
+    expectTypeOf<Marked>().toHaveProperty("read").toEqualTypeOf<boolean>();
+  });
+});
