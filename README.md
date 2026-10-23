@@ -3,7 +3,7 @@
 A production-oriented starting point for a multi-tenant SaaS backend: [Hono](https://hono.dev) on the API layer, [Drizzle ORM](https://orm.drizzle.team) on Postgres, and [Better Auth](https://better-auth.com) handling authentication and organizations — wired together in a type-safe pnpm/Turborepo monorepo.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![Node.js >=22](https://img.shields.io/badge/node-%3E%3D22-6DA55F?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Node.js >=22.23.4](https://img.shields.io/badge/node-%3E%3D22.23.4-6DA55F?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![pnpm](https://img.shields.io/badge/pnpm-10.30.3-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
 [![Hono](https://img.shields.io/badge/Hono-E36002?logo=hono&logoColor=white)](https://hono.dev/)
@@ -27,8 +27,8 @@ Most starter templates either skip auth entirely or bolt on something minimal. T
 
 ## Prerequisites
 
-- Node.js ≥ 22
-- pnpm (see `packageManager` in `package.json` for the exact version)
+- Node.js ≥ 22.23.4 (Node 22's latest security release)
+- pnpm (see `packageManager` in `package.json` for the exact version). `pnpm-workspace.yaml` sets `minimumReleaseAge` to 3 days, so pnpm refuses package versions published more recently than that. For an emergency patch, add the package to `minimumReleaseAgeExclude` temporarily, with a comment, and remove it later.
 - A Postgres database — [Neon](https://neon.tech) has a free tier and works well for local development; any Postgres works
 
 ## Getting started
@@ -41,13 +41,6 @@ pnpm install
 cp .env.example .env.development
 # edit .env.development: set DATABASE_URL to your Postgres instance,
 # generate BETTER_AUTH_SECRET with `npx auth secret`
-
-# Create the restricted `app_user` role migrations and RLS depend on — do this before
-# the first migration, not after (some migrations grant/revoke privileges on app_user
-# by name, so it must already exist):
-APP_ROLE_PASSWORD=<a-real-secret> pnpm --filter @repo/db create-app-role
-# then add to .env.development:
-# APP_DATABASE_URL=postgresql://app_user:<that password>@<host>/<db>
 
 # Create the restricted `app_user` role migrations and RLS depend on — do this before
 # the first migration, not after (some migrations grant/revoke privileges on app_user
@@ -184,10 +177,19 @@ Run from the repo root (fans out via Turborepo) or scoped with `--filter @repo/a
 
 A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every PR and push to `main`:
 
-1. **Quality gate** — `format:check`, `lint`, `typecheck`, `build`.
+1. **Quality gate** — `pnpm audit --prod --audit-level high` (fails on any high or critical advisory in a production dependency), `format:check`, `lint`, `typecheck`, `build`.
 2. **Test gate** — spins up a Postgres service, runs migrations, then runs `pnpm test`.
 
 To make CI pass, add a repository secret named `BETTER_AUTH_SECRET` (generate with `npx auth secret`). The workflow hardcodes a test-only `STRIPE_WEBHOOK_SECRET` so the webhook signature tests can sign their own payloads; live `STRIPE_SECRET_KEY` and Stripe price IDs are not required — the tests that hit Stripe are skipped when those keys are absent.
+
+`.github/dependabot.yml` turns off routine version-bump PRs but leaves security updates on. Enable **Dependabot security updates** in the repository's settings (Code security) so it opens a PR when an advisory affects a dependency.
+
+## Deployment notes
+
+In production, `apps/api` runs on a Node host with **Cloudflare in front**.
+
+- **The origin must accept traffic only from Cloudflare.** Use Cloudflare Tunnel (no public port), Cloudflare's IP ranges as an allowlist, or authenticated origin pulls. Sign-in, sign-up and password-reset rate limits are keyed on the client IP, which Better Auth reads from `cf-connecting-ip` (`packages/core/src/auth/rate-limit.ts`). Cloudflare always overwrites that header. But if the origin is reachable directly, a client can send its own value and get a fresh rate-limit bucket on every request.
+- Limits: sign-in and password reset 5 per minute per client, sign-up 3 per minute. They're on in production only (`NODE_ENV=production`), and counters live in the database (`rateLimit` table), so they hold across API instances.
 
 The `apps/api/src/modules/billing/` slice is the reference example — read it alongside this. A new feature (say, `widgets`) gets its own slice under `apps/api/src/modules/widgets/`:
 
