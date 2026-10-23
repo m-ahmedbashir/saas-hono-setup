@@ -1,4 +1,4 @@
-import { invitationEmail, resetPasswordEmail, sendEmail } from "../email";
+import { invitationEmail, resetPasswordEmail, sendEmail, verifyEmailEmail } from "../email";
 
 // Every link in an auth email is built here, from PORTAL_URL — never from Better Auth's
 // own `url`, whose callbackURL comes from the client, and never from request headers.
@@ -74,4 +74,26 @@ export async function sendInvitationEmail({
       role,
     }),
   });
+}
+
+/**
+ * Better Auth's `emailVerification.sendVerificationEmail`. Unlike reset, the link has to
+ * hit Better Auth's own `GET /verify-email` — that's what marks the account verified and,
+ * with autoSignInAfterVerification, signs the user in. So this keeps Better Auth's `url`
+ * (its origin is `baseURL`, from BETTER_AUTH_URL) but replaces the `callbackURL` it
+ * carries: that one comes from the sign-up/resend request body. Landing on `/profile`
+ * works because the verify step signs the user in. Fire-and-forget for the same reason as
+ * reset: sign-up and resend await this hook (1.7.12 `sign-up.mjs` via
+ * runInBackgroundOrAwait, `email-verification.mjs`'s sendVerificationEmailFn directly).
+ */
+export async function sendVerificationEmailMessage({
+  user,
+  url,
+}: {
+  user: { email: string };
+  url: string;
+}): Promise<void> {
+  const link = new URL(url);
+  link.searchParams.set("callbackURL", `${portalUrl}/profile`);
+  void sendEmail({ to: user.email, ...verifyEmailEmail({ url: link.toString() }) });
 }

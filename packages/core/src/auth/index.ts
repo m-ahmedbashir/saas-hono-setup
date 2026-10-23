@@ -7,7 +7,11 @@ import { accessControl, roles } from "./permissions";
 import { platformAccessControl, platformRoles } from "./platform-permissions";
 import { resolveSeatUsage } from "./membership-limit";
 import { ipAddressOptions, rateLimitOptions } from "./rate-limit";
-import { sendInvitationEmail, sendResetPasswordEmail } from "./emails";
+import {
+  sendInvitationEmail,
+  sendResetPasswordEmail,
+  sendVerificationEmailMessage,
+} from "./emails";
 
 export { statement, roles } from "./permissions";
 export {
@@ -51,6 +55,13 @@ export function createAuth(overrides: { rateLimitEnabled?: boolean } = {}) {
     emailAndPassword: {
       enabled: true,
       sendResetPassword: sendResetPasswordEmail,
+    },
+    // Verification is offered, not required: requireEmailVerification stays off so existing
+    // unverified accounts keep signing in (spec Open question 2).
+    emailVerification: {
+      sendVerificationEmail: sendVerificationEmailMessage,
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
     },
     rateLimit: { ...rateLimitOptions, enabled: overrides.rateLimitEnabled },
     advanced: { ipAddress: ipAddressOptions },

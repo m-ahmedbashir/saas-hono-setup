@@ -46,6 +46,11 @@ describe("Rate limiting", () => {
       window: 60,
       max: SIGN_IN_LIMIT,
     });
+    // Resend is limited too, or its button becomes a way to flood someone's inbox.
+    expect(auth.options.rateLimit?.customRules?.["/send-verification-email"]).toEqual({
+      window: 60,
+      max: 3,
+    });
     expect(auth.options.advanced?.ipAddress?.ipAddressHeaders).toEqual(["cf-connecting-ip"]);
   });
 
