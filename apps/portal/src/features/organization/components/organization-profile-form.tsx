@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppForm } from "@/components/ui/tanstack-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -27,9 +27,12 @@ export function OrganizationProfileForm({
 }) {
   const queryClient = useQueryClient();
   // The last saved profile — the baseline a save is diffed against. A ref, since the form's
-  // onSubmit is created once while `profile` updates after every save.
+  // onSubmit is created once while `profile` updates after every save. Updated after commit,
+  // not during render, so a render React discards can never change the baseline.
   const saved = useRef(profile);
-  saved.current = profile;
+  useLayoutEffect(() => {
+    saved.current = profile;
+  }, [profile]);
   const save = useMutation({
     mutationFn: (update: OrganizationProfileUpdate) =>
       Object.keys(update).length === 0
