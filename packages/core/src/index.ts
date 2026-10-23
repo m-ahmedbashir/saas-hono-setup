@@ -4,3 +4,4 @@ export * from "./notifications/types";
 export * from "./billing/types";
 export * from "./billing/entitlements";
 export { isLiveSubscription } from "./billing/subscription-status";
+export * from "./email";
