@@ -7,6 +7,7 @@ import { accessControl, roles } from "./permissions";
 import { platformAccessControl, platformRoles } from "./platform-permissions";
 import { resolveSeatUsage } from "./membership-limit";
 import { ipAddressOptions, rateLimitOptions } from "./rate-limit";
+import { sendResetPasswordEmail } from "./emails";
 
 export { statement, roles } from "./permissions";
 export {
@@ -49,6 +50,7 @@ export function createAuth(overrides: { rateLimitEnabled?: boolean } = {}) {
     trustedOrigins: (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000").split(","),
     emailAndPassword: {
       enabled: true,
+      sendResetPassword: sendResetPasswordEmail,
     },
     rateLimit: { ...rateLimitOptions, enabled: overrides.rateLimitEnabled },
     advanced: { ipAddress: ipAddressOptions },

@@ -1,6 +1,9 @@
 # Local test database for apps/api's integration tests — the same postgres:16 CI uses, so
 # tests stop crossing the network to the shared dev database (and stop writing into it).
 # Data lives in tmpfs: fast, and every `pnpm test:db` starts from an empty database.
+# A fixed project name, so every checkout and worktree shares this one container instead of
+# each starting its own on the same port.
+name: saas-hono-test
 services:
   test-db:
     image: postgres:16
@@ -9,7 +12,9 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: saas_test
     ports:
-      - "55432:5432"
+      # localhost only: the superuser password above is committed, so it must not be
+      # reachable from anywhere else on the network.
+      - "127.0.0.1:55432:5432"
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
