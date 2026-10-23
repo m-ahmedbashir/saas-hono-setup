@@ -166,18 +166,20 @@ Zod schema in `features/auth/schemas/`, `authClient` calls, errors shown in an `
 
 ## Tasks
 
-- [ ] **1. Email contract + registry + templates** in `packages/core/src/email/`, with unit tests.
+`[x]` done and merged to `develop` · `[~]` in progress · `[ ]` not started.
+
+- [x] **1. Email contract + registry + templates** in `packages/core/src/email/`, with unit tests.
       Export through a side-effect-free subpath only if client code needs it (it shouldn't).
-- [ ] **2. Console sender + provider sender** in `apps/api/src/modules/email/`, registered in
+- [x] **2. Console sender + provider sender** in `apps/api/src/modules/email/`, registered in
       `lib/auth-wiring.ts` (provider when its key is set, console otherwise). Provider file is the
       only one importing the SDK.
-- [ ] **3. Password reset hook** + integration tests (incl. the unknown-address case and the
+- [x] **3. Password reset hook** + integration tests (incl. the unknown-address case and the
       not-awaited send).
-- [ ] **4. Portal forgot-password and reset-password pages** + component tests. Fixes the dead
+- [x] **4. Portal forgot-password and reset-password pages** + component tests. Fixes the dead
       sign-in link.
-- [ ] **5. Verification email on sign-up** + verify notice in the portal + tests.
-- [ ] **6. Invitation email hook** + integration test; update the team page copy ("we've emailed
-      them; you can also share this link").
+- [~] _(in progress)_ **5. Verification email on sign-up** + verify notice in the portal + tests.
+- [~] _(in progress)_ **6. Invitation email hook** + integration test; update the team page copy ("we've emailed
+  them; you can also share this link").
 - [ ] **7. Docs:** README env vars and setup, AGENTS.md section (email contract, "don't await the
       reset send", unregistered-sender behaviour), CHANGELOG entry text in the PR.
 
