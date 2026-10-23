@@ -177,7 +177,7 @@ describe("TeamView", () => {
     );
   });
 
-  it("invites someone and shows a shareable link for that invitation", async () => {
+  it("invites someone, says they were emailed, and still offers a shareable link", async () => {
     inviteMemberMock.mockResolvedValue({ data: { id: "inv_new" }, error: null });
     const user = userEvent.setup();
     renderView();
@@ -194,6 +194,8 @@ describe("TeamView", () => {
     );
     const link = (await screen.findByLabelText("Invitation link")) as HTMLInputElement;
     expect(link.value).toMatch(/\/auth\/accept-invite\?id=inv_new$/);
+    expect(screen.getByText(/we've emailed them/i)).toBeInTheDocument();
+    expect(screen.getByText(/you can also share this link/i)).toBeInTheDocument();
   });
 
   it("explains a full plan in plain words when the invite hits the seat limit", async () => {

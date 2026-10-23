@@ -7,7 +7,7 @@ import { accessControl, roles } from "./permissions";
 import { platformAccessControl, platformRoles } from "./platform-permissions";
 import { resolveSeatUsage } from "./membership-limit";
 import { ipAddressOptions, rateLimitOptions } from "./rate-limit";
-import { sendResetPasswordEmail } from "./emails";
+import { sendInvitationEmail, sendResetPasswordEmail } from "./emails";
 
 export { statement, roles } from "./permissions";
 export {
@@ -69,6 +69,7 @@ export function createAuth(overrides: { rateLimitEnabled?: boolean } = {}) {
           const { limit, members } = await resolveSeatUsage(invitingOrganization.id);
           return Math.max(limit - members, 0);
         },
+        sendInvitationEmail,
         // A second instance of this file's one documented DIP exception (importing `db`
         // for the adapter above) — Better Auth's hook API can only be wired here, inside
         // the same betterAuth() config, so the organization_profile row (specifically its
