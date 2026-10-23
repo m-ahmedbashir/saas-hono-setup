@@ -19,6 +19,24 @@ limiting protects sign-in, sign-up and password reset from brute force.
 Checked on 2026-10-23 with `pnpm audit`, `npm view`, the Better Auth 1.7 upgrade guide and this
 repo. **Re-run `pnpm audit` before starting — new advisories appear weekly.**
 
+### Version policy — not "latest", the smallest safe jump
+
+- **Target the newest patch of the release line that fixes the advisory**, not the newest
+  major. A bigger jump adds breaking changes without adding security. Every target below was
+  checked this way (e.g. Next 16.4.x, not 17; `@hono/node-server` 1.19.x, not 2.x; Vitest 4.1.x,
+  not 5).
+- **Don't install a version published less than 3 days ago.** Fresh releases are how npm
+  supply-chain attacks spread (a hijacked maintainer account publishes a malicious version;
+  it's usually caught and pulled within days). Task 0 makes pnpm enforce this. Release dates of
+  the targets, checked 2026-10-23: next 16.4.2 (10-15), hono 4.13.13 (10-04), drizzle-orm
+  0.45.4 (10-08), drizzle-kit 0.31.11 (09-21), sharp 0.35.5 (09-27), vitest 4.1.12 (10-15),
+  better-auth 1.7.12 (10-20), `@hono/node-server` 1.19.17 (07-27).
+- **Compatibility checked:** `next@16.4.2` itself requires `sharp@^0.35.5`; `@hono/zod-validator`
+  0.9.x accepts `hono >=4.11.2`; `@hono/node-ws` accepts `@hono/node-server ^1.19.11`;
+  `vitest@4.1.12` needs Vite 6–8 and supports Node 22.
+- If a newer patch has appeared by the time a task starts, use it (once it's 3+ days old) and
+  re-check the audit.
+
 ### Production runtime (exploitable on a live server)
 
 | Package (where)                     | Now → fix              | Why it matters here                                                                                                                                                                                                                                                                                            |
@@ -33,7 +51,7 @@ repo. **Re-run `pnpm audit` before starting — new advisories appear weekly.**
 
 | Package                                                           | Now → fix                                  | Note                                                                                                                                                                                        |
 | ----------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `vitest` (every package)                                          | 2.1.9 → latest (5.x)                       | Critical: a tinypool prototype-pollution-to-RCE gadget, file read and execution through the UI server, and mocker path traversal. **4.1.12** is the lowest version that clears all of them. |
+| `vitest` (every package)                                          | 2.1.9 → **4.1.12** (not 5)                 | Critical: a tinypool prototype-pollution-to-RCE gadget, file read and execution through the UI server, and mocker path traversal. **4.1.12** is the lowest version that clears all of them. |
 | `vite` / `@vitejs/plugin-react`                                   | vite 5.4.21 → ≥ 6.4.4 (plugin-react 4 → 6) | `fs.deny` bypass on Windows, path traversal, and `launch-editor` command execution. This is a Windows dev machine.                                                                          |
 | `drizzle-kit` (db)                                                | 0.30 → **0.31.11**                         | Brings old `esbuild` and `shell-quote` (a critical command injection) through `gel`. 0.31.4 or newer is also Better Auth's peer requirement.                                                |
 | `@faker-js/faker`, `sort-by`, `@types/sort-by` (admin)            | **remove**                                 | Template leftovers with no imports in `apps/admin/src`. faker has an RCE advisory; `sort-by` pulls in a vulnerable `object-path`.                                                           |
@@ -180,6 +198,12 @@ The numbers are placeholders until Open question 2 is answered.
 ## Tasks
 
 Each task is its own small PR from `develop`, in this order.
+
+- [ ] **0. Guard rails (tiny).**
+  - Root `package.json` `engines.node`: `>=22` → `>=22.23.4` (Node's latest security release).
+  - `pnpm-workspace.yaml`: `minimumReleaseAge: 4320` (3 days, in minutes; pnpm 10.16+, we run
+    10.30.3) so `pnpm add`/`install` refuses versions younger than that. If an emergency patch is
+    newer, add it to `minimumReleaseAgeExclude` temporarily, with a comment, and remove it later.
 
 - [ ] **1. Next.js + sharp (urgent).** Update `next` and `@next/eslint-plugin-next` to 16.4.2 in
       both apps, and `sharp` to 0.35.5. Ship this first. **If anything is deployed, do this
