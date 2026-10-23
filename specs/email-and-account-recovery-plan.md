@@ -20,7 +20,14 @@ org owners/admins inviting people. Staff (`apps/admin`) are out of scope — see
 
 ## Verified facts this plan relies on
 
-Checked against the installed `better-auth@1.6.23` / `@better-auth/core@1.6.23`:
+Checked against `better-auth@1.6.23` when written. **The repo is now on 1.7.12 — re-confirm
+each fact below in the installed 1.7.12 source before relying on it** (specs/README.md rule 3);
+if anything moved, the source wins and this spec gets updated.
+
+- **Rate limiting already exists** (`packages/core/src/auth/rate-limit.ts`, production only,
+  database storage, client IP from `cf-connecting-ip`). `/request-password-reset` is already
+  limited to 5/min. **Add `/send-verification-email`** to `customRules` (suggest 3/min), or the
+  "resend" button becomes a way to spam someone's inbox. Keep the rule list in that one file.
 
 - Hook options exist (`@better-auth/core/dist/.../init-options.d.mts`):
   - `emailAndPassword.sendResetPassword({ user, url, token }, request)`,
