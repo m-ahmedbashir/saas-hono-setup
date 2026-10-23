@@ -10,6 +10,9 @@ const AUTHENTICATED_HOME_PATH = "/profile";
 // `/auth` — it must work for a signed-in existing member accepting an invite to a
 // *second* org, not just a brand-new signup (see its own page for the two-path flow).
 const PROTECTED_PATHS = ["/profile", "/billing", "/team"];
+// /auth pages a signed-in user may still need: accepting an invite to another org, and an
+// emailed reset link opened in a browser that's signed in (the token decides the account).
+const AUTH_PATHS_OPEN_WHEN_SIGNED_IN = ["/auth/accept-invite", "/auth/reset-password"];
 
 // Presence-only check (Better Auth's documented Next.js middleware pattern) — fast and
 // edge-safe, not full session validation. There's no DB round trip possible here, so a
@@ -23,7 +26,11 @@ export function proxy(request: NextRequest) {
   if (PROTECTED_PATHS.some((path) => pathname.startsWith(path)) && !hasSessionCookie) {
     return NextResponse.redirect(new URL(SIGN_IN_PATH, request.url));
   }
-  if (pathname.startsWith("/auth") && pathname !== "/auth/accept-invite" && hasSessionCookie) {
+  if (
+    pathname.startsWith("/auth") &&
+    !AUTH_PATHS_OPEN_WHEN_SIGNED_IN.includes(pathname) &&
+    hasSessionCookie
+  ) {
     return NextResponse.redirect(new URL(AUTHENTICATED_HOME_PATH, request.url));
   }
   return NextResponse.next();
