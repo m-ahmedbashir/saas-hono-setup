@@ -64,6 +64,20 @@ apps/portal/src/app/auth/reset-password/page.tsx       reads ?token=
 apps/portal/src/features/auth/components/{forgot-password-view,reset-password-view}.tsx
 ```
 
+- **Email is a transport, not a notification — two layers, one sender.** `EmailSender` (this
+  spec) is the low-level "send this email" contract. The notifications module
+  (`packages/core/src/notifications/types.ts`) already has a `NotificationChannel` interface
+  meant for an email channel later; when email _notifications_ are wanted, that's one new
+  `email-channel.ts` in `apps/api/src/modules/notifications/channels/` (next to
+  `websocket-channel.ts`) that calls the same `EmailSender`. **Don't build it in this spec.**
+  The auth emails here call `EmailSender` directly and must **never** go through
+  notifications, because:
+  - they carry one-time tokens, and notifications are persisted to the `notification` table
+    and shown in the in-app inbox — a reset link would be stored in the database and visible
+    to anyone with the session;
+  - they go to people who may have no account (invitees) or whose email isn't verified yet —
+    notifications are addressed to a `userId`;
+  - they must always send, regardless of any future notification preferences or unsubscribe.
 - **Why a registry, not a direct import:** Better Auth's hooks must live in `packages/core`'s
   `betterAuth()` config, and `packages/core` must never import `apps/api` (AGENTS.md). Reuse
   the exact pattern `membership-limit.ts` established; don't invent a second one.
