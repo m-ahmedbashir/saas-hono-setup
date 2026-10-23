@@ -13,7 +13,7 @@ export interface PlatformIndividual {
   email: string;
   emailVerified: boolean;
   banned: boolean | null;
-  createdAt: Date;
+  createdAt: string; // ISO string over JSON — this file is replaced by AppType-derived types
   phone: string | null;
   dateOfBirth: Date | null;
   plan: string | null;

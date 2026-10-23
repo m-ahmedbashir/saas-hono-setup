@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { getPlatformOrganizations, getPlatformOrganizationDetail } from "./service";
-import type { PlatformOrganization, PlatformOrganizationFilters } from "./types";
+import type { PlatformOrganization, PlatformOrganizationFilters } from "./service";
 
 export type { PlatformOrganization };
 
@@ -14,7 +14,7 @@ export const platformOrganizationKeys = {
 
 export const platformOrganizationsQueryOptions = (
   filters: PlatformOrganizationFilters,
-  headers?: HeadersInit,
+  headers?: Record<string, string>,
 ) =>
   queryOptions({
     queryKey: platformOrganizationKeys.list(filters),
@@ -23,7 +23,7 @@ export const platformOrganizationsQueryOptions = (
 
 export const platformOrganizationDetailQueryOptions = (
   organizationId: string,
-  headers?: HeadersInit,
+  headers?: Record<string, string>,
 ) =>
   queryOptions({
     queryKey: platformOrganizationKeys.detail(organizationId),
