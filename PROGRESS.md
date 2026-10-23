@@ -81,6 +81,7 @@ Point-in-time status of what's actually built and verified in this repo. This is
 - **CORS blocked every portal checkout** — the API didn't allow the `Idempotency-Key` header, so the browser's preflight would have refused the request. Invisible to the portal's unit tests (they mock `fetch`); caught by reading the request pipeline, now covered by a real preflight test.
 - **Stripe sent customers back to the staff app** — `BILLING_CHECKOUT_RETURN_URL` defaulted to `apps/admin`'s port.
 - **Two open-redirect bypasses in `safe-redirect.ts`** before it shipped — first control characters (`/%09/evil.example`), then dot segments (`/.//evil.example`), each normalizing to `//evil.example`. Fixed by validating with the URL parser and checking the exact path returned; both have regression tests. Lesson: validate the value you actually hand back, not an intermediate one.
+- **The Drizzle 0.45 upgrade silently broke unique-violation handling.** Since 0.44 every failed query is wrapped in `DrizzleQueryError` (the pg error moves to `.cause`), so `err.code === "23505"` never matched. A duplicate plan returned 500 instead of 422. Worse, `ensureOrganizationProfileRow`'s race fallback would have thrown, and no test covered it. Now one `isUniqueViolation` in `@repo/db`. The new race test holds one transaction's commit and waits on `pg_stat_activity` until the second insert is blocked. The first version, a plain `Promise.all`, never actually raced and passed on the broken code.
 
 ## Removed — deliberately deferred, not lost
 
@@ -100,6 +101,7 @@ Do not build on these without checking they still make sense first — see [AGEN
 
 ## Not done
 
+- **The Cloudflare origin lock is a deployment step, not code.** Rate limiting trusts `cf-connecting-ip`, which is only safe once the origin rejects non-Cloudflare traffic (README's Deployment notes). The Node host itself isn't chosen yet (Railway or Fly suggested).
 - OpenAPI docs (`@hono/zod-openapi` + `@scalar/hono-api-reference`) discussed, not adopted — no Zod-schema-based REST route exists yet to establish the convention on (the WS notification route doesn't go through that pattern).
 - **Stripe Customer Portal** (plan switching with proration, cancel at period end, card updates, buying more seats) — agreed direction, not started; its own spec and branch. Until then, changing plans means cancel first, and an org can't add seats to a live subscription.
 - **Invitation emails** — no email provider; invitations are shareable links. (The invite → accept round trip itself is now tested end to end in `organization-permissions.integration.test.ts`, including seat-limit refusals.)

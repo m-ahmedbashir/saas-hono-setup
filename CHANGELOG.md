@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project follows [Semantic Versioning](https://semver.org/) once it reaches 1.0.0 — until then, minor versions may include breaking changes.
 
+## [Unreleased]
+
+### Added
+
+- **Production rate limiting on sign-in, sign-up and password reset**: sign-in and reset 5 per minute per client, sign-up 3 per minute. Counters live in the database, so the limit holds across API instances. The client IP comes from `cf-connecting-ip` (the API runs behind Cloudflare), so **the origin must accept Cloudflare traffic only** (README's Deployment notes). Adds Better Auth's generated `rateLimit` table.
+
+### Security
+
+- **Patched the known vulnerabilities in our dependencies** (`specs/security-upgrades-plan.md`). The biggest was unauthenticated remote code execution in Next.js 16.2.6's image optimization, which both frontends exposed. `pnpm audit --prod --audit-level high` is now clean, and `pnpm audit` reports no critical advisories.
+  - `next` 16.4.2 and `sharp` 0.35.5 (both frontends): the RCE, proxy-bypass, SSRF and cache-poisoning advisories, plus the libvips/libheif/librsvg CVEs.
+  - `hono` 4.13.13 (still one exact pin in all four packages) and `@hono/node-server` 1.19.17: ReDoS in the CORS middleware we use, and parser fixes.
+  - `drizzle-orm` 0.45.4 and `drizzle-kit` 0.31.11: SQL injection through badly escaped identifiers. Also clears `shell-quote`'s command injection.
+  - `better-auth` 1.7.12, one exact pin everywhere, with `zod` 4.6.7. Session lookup errors are no longer treated as signed out, and concurrent requests can no longer exceed database rate limits. Installed a day before its 3-day release age, by explicit decision, through a version-pinned `minimumReleaseAgeExclude` entry that comes out once it matures.
+  - Dev tooling: `vitest` 4.1.12, `vite` 6.4.4, `@vitejs/plugin-react` 4.7.0. Clears the tinypool RCE gadgets, Vitest UI file read, mocker path traversal, and Vite's Windows `fs.deny` / `launch-editor` advisories.
+  - Removed unused template packages from `apps/admin` (`@faker-js/faker`, `sort-by`), its demo sales card, and its only remote image host.
+- **pnpm refuses versions published less than 3 days ago** (`minimumReleaseAge`), so a hijacked release can't be installed before it's caught. Node's floor rises to 22.23.4.
+- **CI fails on any new high or critical advisory** in a production dependency. Dependabot is configured for security-update PRs only.
+
+### Fixed
+
+- **Creating a duplicate subscription plan returned a 500 instead of a 422**, and two concurrent first reads of an organization's profile could fail instead of sharing one row. drizzle-orm 0.44+ wraps database errors, which hid the unique-violation code our checks read. Both now use one shared `isUniqueViolation` helper, and a new test reproduces the race deterministically.
+
 ## [0.28.0] — 2026-10-22
 
 ### Added
