@@ -68,8 +68,8 @@ export function InviteMemberDialog() {
               <DialogHeader>
                 <DialogTitle>Invitation created</DialogTitle>
                 <DialogDescription>
-                  Send this link to the person you invited. It only works for the email address you
-                  entered.
+                  We&apos;ve emailed them; you can also share this link. It only works for the email
+                  address you entered.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex min-w-0 items-center gap-2">
@@ -92,8 +92,8 @@ export function InviteMemberDialog() {
               <DialogHeader>
                 <DialogTitle>Invite a member</DialogTitle>
                 <DialogDescription>
-                  You&apos;ll get a link to share with them. Each person you invite uses one seat on
-                  your plan.
+                  We&apos;ll email them an invitation, and you&apos;ll get a link to share too. Each
+                  person you invite uses one seat on your plan.
                 </DialogDescription>
               </DialogHeader>
               <form.AppForm>
