@@ -43,22 +43,24 @@ Checked against `better-auth@1.6.23`, `@better-auth/core@1.6.23` and this repo:
 ```
 apps/portal/src/app/(portal)/profile/page.tsx      existing; gains sections below
 apps/portal/src/features/profile/components/
-  personal-details-form.tsx      GET/PATCH /profile via apiFetch
+  personal-details-form.tsx      GET/PATCH /profile via the `api` client + unwrap()
   active-sessions.tsx            authClient.listSessions / revokeSession / revokeOtherSessions
   change-email-form.tsx          authClient.changeEmail (after the email spec ships)
-  delete-account-section.tsx     DELETE /account via apiFetch, typed confirmation
+  delete-account-section.tsx     DELETE /account via the `api` client, typed confirmation
+apps/portal/src/features/profile/api/service.ts   the `apps/api` calls (types inferred, no types.ts)
 packages/core/src/auth/index.ts  rateLimit: { storage: "database", customRules }; changeEmail
 ```
 
 - **Delete account:** confirm by typing your email; on success sign out and go to `/auth/sign-in`.
   Map the 422 "only owner with other members" case to a plain message with a link to
   `/organization/settings` (transfer ownership — organization spec) — don't guess the cause from
-  text, check the error code.
+  text, check the `ApiError`'s `code` (thrown by `unwrap()`).
 - **Active sessions:** list device/browser (from user agent), last active, "this device" marker.
   "Sign out other devices" calls `revokeOtherSessions`. Signing out the current session goes
   through the normal sign-out.
 - **Personal details:** form fields map 1:1 to the profile API. Send only changed fields;
-  clearing a field sends `null` (the API's omitted-vs-null rule).
+  clearing a field sends `null` (the API's omitted-vs-null rule). The payload type comes from the
+  route (`InferRequestType<typeof api.profile.$patch>["json"]`), not a hand-written copy.
 - **Rate limiting:** set `storage: "database"` so all instances share counters. The table it
   needs comes from Better Auth's CLI — regenerate the auth schema exactly as AGENTS.md's "Auth-
   related tables are generated, never hand-edited" describes, merge the diff, then
@@ -73,7 +75,7 @@ Existing stack, no new dependencies. One generated migration (rate-limit table).
 
 ```
 pnpm --filter @repo/portal test
-pnpm --filter @repo/api test -- --no-file-parallelism
+pnpm --filter @repo/api test
 npx @better-auth/cli@latest generate --config packages/core/src/auth/index.ts --output packages/db/src/auth-schema.generated.ts
 ```
 
@@ -86,7 +88,8 @@ pattern: explicit `AlertDialog` confirmation, destructive button, errors shown i
 
 ## Testing strategy
 
-- **Portal component tests** (mock only `apiFetch`/`authClient`):
+- **Portal tests:** `api/service.test.ts` pins the exact requests (mocks only global `fetch`, like
+  the billing service test); component tests mock only the service functions and `authClient`:
   - Delete: confirm button disabled until the typed email matches; success signs out; the
     only-owner 422 shows the transfer-ownership message.
   - Sessions: list renders; "this device" marked; revoke-others calls the client.
@@ -104,8 +107,9 @@ pattern: explicit `AlertDialog` confirmation, destructive button, errors shown i
 - [ ] **1. Personal details form** + tests.
 - [ ] **2. Active sessions section** + tests.
 - [ ] **3. Delete account section** + tests.
-- [ ] **4. Rate limiting:** database storage + custom rules + generated schema/migration +
-      integration test. (Touches `betterAuth()` config — human review before merge.)
+- [x] **4. Rate limiting:** moved to [security-upgrades-plan.md](./security-upgrades-plan.md)
+      task 7 — it has to land after the Better Auth 1.7 upgrade (database rate-limit fix,
+      GHSA-44jh-23m7-hpcf). Don't build it here.
 - [ ] **5. Change email** — only after the email spec has merged; enable `user.changeEmail` with
       confirmation + form + tests.
 - [ ] **6. Docs:** AGENTS.md (rate-limit storage and why; deletion uses `DELETE /account`), README

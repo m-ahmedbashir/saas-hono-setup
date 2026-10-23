@@ -48,7 +48,7 @@ apps/api/src/modules/organization/                transfer-ownership: route + co
 apps/portal/src/app/(portal)/organization/new/page.tsx          create
 apps/portal/src/app/(portal)/organization/settings/page.tsx     rename, profile, leave, delete
 apps/portal/src/features/organization/
-  api/service.ts            Better Auth calls (create, update, leave) + apiFetch for apps/api
+  api/service.ts            Better Auth calls (create, update, leave) + `api` client for apps/api
   components/create-organization-view.tsx
   components/organization-settings-view.tsx
   components/{organization-profile-form,danger-zone,transfer-ownership-dialog}.tsx
@@ -60,20 +60,24 @@ apps/portal/src/features/organization/
   `useSwitchOrganization` and go to `/team`. Entry points: the organization switcher ("Create
   organization") and `/team`'s "Teams are for organizations" empty state.
 - **Rename:** `authClient.organization.update` (needs the new `update` permission).
-- **Profile:** the existing `GET`/`PATCH /organization-profile` via `apiFetch`. `orgNumber` is
+- **Profile:** the existing `GET`/`PATCH /organization-profile` via
+  `unwrap(await api["organization-profile"].$get())` / `.$patch({ json })`. `orgNumber` is
   read-only and system-generated — show it, never send it.
 - **Leave:** `authClient.organization.leave`. Hide it for the only owner and explain why; still
   handle the server's refusal code with a plain message.
-- **Delete:** the existing `DELETE /organization` via `apiFetch` (not Better Auth's own delete,
-  which would skip the Stripe cancellation), behind a confirmation where the user types the org
-  name. Afterwards switch to the personal account.
+- **Delete:** the existing `DELETE /organization` via `unwrap(await api.organization.$delete())` (not Better Auth's own
+  delete, which would skip the Stripe cancellation), behind a confirmation where the user types
+  the org name. Switch to the personal account only after `unwrap` resolves — `hc` returns a
+  response even when the delete fails, and `unwrap` is what turns that into a thrown `ApiError`.
 - **Transfer ownership — one server action, not two client calls.** It's two writes (promote the
   new owner, demote the old one); doing them from the browser can leave the org half-changed if
   the second fails. Add `POST /organization/transfer-ownership` in `apps/api` that, for the
   caller's active org: requires the new `organization: ["transfer-ownership"]` permission, checks
   the target is a member, **promotes the target first, then demotes the caller to `admin`** (so a
   failure part-way leaves two owners, never zero), using Better Auth's server API with the
-  caller's headers. Body validated with Zod (`{ memberId }`).
+  caller's headers. Body validated with Zod (`{ memberId }`). Inline `zValidator` in the route
+  chain and no return-type annotation on the controller, so the portal's `api` client gets the
+  request and response types automatically.
 - **Permissions are checked, never inferred from role names** — reuse `canManageTeam`'s approach
   (`Role.authorize()` on the caller's role from the live member list).
 
@@ -82,7 +86,7 @@ apps/portal/src/features/organization/
 Existing stack, no new dependencies.
 
 ```
-pnpm --filter @repo/api test -- src/modules/organization --no-file-parallelism
+pnpm --filter @repo/api test src/modules/organization
 pnpm --filter @repo/portal test
 pnpm --filter @repo/portal dev
 ```
@@ -90,7 +94,9 @@ pnpm --filter @repo/portal dev
 ## Code style
 
 Server: follow `apps/api/src/modules/billing/` — `.routes.ts` lists middleware and a named
-handler; logic in `.service.ts`. Portal: follow `apps/portal/src/features/team/` — Better Auth
+handler; logic in `.service.ts`. Portal: `apps/api` calls follow
+`apps/portal/src/features/billing/api/service.ts` (`unwrap(await api.<route>.$get())`, types
+inferred — never write a `types.ts`). Better Auth calls follow `apps/portal/src/features/team/` — Better Auth
 calls go through a `service.ts` with `unwrap()` that keeps the error `code`
 (`TeamActionError`), and known codes map to plain-language messages:
 

@@ -93,7 +93,7 @@ Existing stack only; the email provider SDK is the one new dependency (see Open 
 
 ```
 pnpm --filter @repo/core test
-pnpm --filter @repo/api test -- --no-file-parallelism
+pnpm --filter @repo/api test
 pnpm --filter @repo/portal test
 pnpm --filter @repo/portal dev          # :3002 — needs apps/api running (:8787)
 pnpm --filter @repo/api dev
