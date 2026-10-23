@@ -200,3 +200,34 @@ describe("POST /api/auth/organization/update (rename)", () => {
     expect(await orgName(orgId)).toBe("Renamed By Admin");
   }, 20000);
 });
+
+// The portal's self-serve create (specs/organization-self-serve-plan.md): Better Auth's
+// defaults allow any user to create an org (no allowUserToCreateOrganization/
+// organizationLimit set — verified in the installed 1.7.12 crud-org.mjs).
+describe("POST /api/auth/organization/create (self-serve)", () => {
+  it("makes a brand-new individual the owner of an org that becomes active, with its profile row created", async () => {
+    const founder = await signUp(`org-create-founder-${Date.now()}@example.com`);
+    cleanupUserIds.push(founder.userId);
+    const orgId = await createOrg(founder.cookie, "Founder Org");
+    cleanupOrgIds.push(orgId);
+
+    const activeRes = await fetch(
+      `http://localhost:${PORT}/api/auth/organization/get-active-member`,
+      {
+        headers: { Origin: ORIGIN, Cookie: founder.cookie },
+      },
+    );
+    const activeMember = (await activeRes.json()) as { organizationId: string; role: string };
+    expect(activeRes.status).toBe(200);
+    expect(activeMember).toMatchObject({ organizationId: orgId, role: "owner" });
+
+    const profileRows = await withSystemScope((tx) =>
+      tx
+        .select({ orgNumber: organizationProfile.orgNumber })
+        .from(organizationProfile)
+        .where(eq(organizationProfile.organizationId, orgId)),
+    );
+    expect(profileRows).toHaveLength(1);
+    expect(profileRows[0]!.orgNumber).toMatch(/^[A-Z2-9]{8}$/);
+  }, 15000);
+});

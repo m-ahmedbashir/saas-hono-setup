@@ -101,6 +101,10 @@ describe("TeamView", () => {
     useActiveOrganizationMock.mockReturnValue({ data: null, isPending: false });
     renderView();
     expect(await screen.findByText("Teams are for organizations")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create organization" })).toHaveAttribute(
+      "href",
+      "/organization/new",
+    );
   });
 
   // Better Auth doesn't pick an active organization at sign-in, so a member on a fresh

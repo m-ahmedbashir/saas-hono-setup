@@ -5,34 +5,9 @@
 // /organization/* call), so only writes live here.
 import { roles } from "@repo/core/auth/permissions";
 import { authClient } from "@/lib/auth-client";
+import { describeAuthError, unwrapAuthResult as unwrap } from "@/lib/auth-action";
 
 export type InvitableRole = "member" | "admin";
-
-/** A Better Auth error, keeping its machine-readable `code` (e.g. INVITATION_LIMIT_REACHED) so callers can branch on it rather than on message text. */
-export class TeamActionError extends Error {
-  readonly code: string | undefined;
-
-  constructor(message: string, code: string | undefined) {
-    super(message);
-    this.name = "TeamActionError";
-    this.code = code;
-  }
-}
-
-// authClient calls resolve { data, error } and never throw for expected failures —
-// normalized into a thrown error here so TanStack Query's mutation error state works.
-function unwrap<T>(result: {
-  data: T | null;
-  error: { message?: string; code?: string } | null;
-}): T {
-  if (result.error) {
-    throw new TeamActionError(result.error.message ?? "Request failed", result.error.code);
-  }
-  if (result.data === null) {
-    throw new TeamActionError("Request returned no data", undefined);
-  }
-  return result.data;
-}
 
 export async function inviteMember(input: { email: string; role: InvitableRole }) {
   return unwrap(await authClient.organization.inviteMember(input));
@@ -97,6 +72,5 @@ const friendlyMessages: Record<string, string> = {
 
 /** User-facing text for a team action failure — Better Auth's own message when there's no clearer one. */
 export function describeTeamError(error: Error): string {
-  const code = error instanceof TeamActionError ? error.code : undefined;
-  return (code && friendlyMessages[code]) || error.message;
+  return describeAuthError(error, friendlyMessages);
 }

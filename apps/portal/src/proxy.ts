@@ -9,7 +9,7 @@ const AUTHENTICATED_HOME_PATH = "/profile";
 // its own top-level path. accept-invite is deliberately excluded even though it's under
 // `/auth` — it must work for a signed-in existing member accepting an invite to a
 // *second* org, not just a brand-new signup (see its own page for the two-path flow).
-const PROTECTED_PATHS = ["/profile", "/billing", "/team"];
+const PROTECTED_PATHS = ["/profile", "/billing", "/team", "/organization"];
 // /auth pages a signed-in user may still need: accepting an invite to another org, an
 // emailed reset link opened in a browser that's signed in (the token decides the account),
 // and the verify link's landing page (verifying itself signs the user in).
