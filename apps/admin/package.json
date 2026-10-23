@@ -45,7 +45,6 @@
     "recharts": "^2.15.4",
     "sharp": "^0.33.5",
     "sonner": "^1.7.4",
-    "sort-by": "^1.2.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
     "tailwindcss-animate": "^1.0.7",
@@ -55,7 +54,6 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@faker-js/faker": "^9.9.0",
     "@next/eslint-plugin-next": "16.2.6",
     "@repo/api": "workspace:*",
     "@testing-library/jest-dom": "^6.6.3",
@@ -64,7 +62,6 @@
     "@types/node": "22.10.2",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@types/sort-by": "^1.2.3",
     "@vitejs/plugin-react": "^4.3.4",
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^25.0.1",
