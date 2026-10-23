@@ -75,6 +75,26 @@ describe("proxy", () => {
     expect(response?.headers.get("location")).toBeNull();
   });
 
+  // A reset link opened in a browser that's still signed in must still work — the token,
+  // not the session, decides whose password changes.
+  it("lets an authenticated user reach /auth/reset-password", () => {
+    getSessionCookieMock.mockReturnValue("session-token-value");
+    const request = new NextRequest("http://localhost:3002/auth/reset-password?token=tok_1");
+
+    const response = proxy(request);
+
+    expect(response?.headers.get("location")).toBeNull();
+  });
+
+  it("still sends a signed-in user away from /auth/forgot-password", () => {
+    getSessionCookieMock.mockReturnValue("session-token-value");
+    const request = new NextRequest("http://localhost:3002/auth/forgot-password");
+
+    const response = proxy(request);
+
+    expect(response?.headers.get("location")).toBe("http://localhost:3002/profile");
+  });
+
   it("leaves an unrelated public route alone regardless of session state", () => {
     getSessionCookieMock.mockReturnValue(null);
     const request = new NextRequest("http://localhost:3002/about");
