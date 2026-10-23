@@ -20,7 +20,7 @@ flowchart LR
     subgraph packages["packages/"]
         core["core<br/>auth, permissions,<br/>business rules"]
         db["db<br/>schema, queries,<br/>migrations"]
-        shared["shared<br/>apiFetch, query client"]
+        shared["shared<br/>typed API client, query client"]
     end
 
     pg[("Postgres<br/>(Neon)")]
@@ -40,18 +40,19 @@ flowchart LR
     stripe -- "webhooks" --> api
 ```
 
-| Piece             | What it is                                                                                                     | Talks to                                  |
-| ----------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `apps/portal`     | Customer self-service: sign up/in, profile, billing (team management in progress)                              | `apps/api` only                           |
-| `apps/admin`      | Staff back office: users, organizations, individuals, plan catalog, notifications                              | `apps/api` only                           |
-| `apps/api`        | The only backend. Every request is authenticated, permission-checked and validated here                        | Postgres, Stripe                          |
-| `packages/core`   | Pure logic — Better Auth config, permission statements, error codes, entitlement rules. No HTTP                | `packages/db` (for Better Auth's adapter) |
-| `packages/db`     | Drizzle table definitions (the single source of truth for data shapes), the `db` client, RLS scope helpers     | Postgres                                  |
-| `packages/shared` | Frontend plumbing both Next.js apps use — `apiFetch` (unwraps the response envelope), React Query client, `cn` | —                                         |
+| Piece             | What it is                                                                                                                   | Talks to                                  |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `apps/portal`     | Customer self-service: sign up/in, profile, billing (team management in progress)                                            | `apps/api` only                           |
+| `apps/admin`      | Staff back office: users, organizations, individuals, plan catalog, notifications                                            | `apps/api` only                           |
+| `apps/api`        | The only backend. Every request is authenticated, permission-checked and validated here                                      | Postgres, Stripe                          |
+| `packages/core`   | Pure logic — Better Auth config, permission statements, error codes, entitlement rules. No HTTP                              | `packages/db` (for Better Auth's adapter) |
+| `packages/db`     | Drizzle table definitions (the single source of truth for data shapes), the `db` client, RLS scope helpers                   | Postgres                                  |
+| `packages/shared` | Frontend plumbing both Next.js apps use — the typed `hc` API client + `unwrap` (response envelope), React Query client, `cn` | —                                         |
 
 Two things worth knowing up front:
 
 - **The frontends never touch the database or Stripe.** They call `apps/api` directly (no Next.js proxy route in between). Next.js's `proxy.ts` only checks a session cookie _exists_ to decide where to route the browser — `apps/api` re-checks the real session on every request.
+- **The frontends never hand-write API types.** Each app's client is typed from `apps/api`'s own routes (`AppType`, a type-only import), so renaming a field in an API response breaks the frontend's typecheck instead of its runtime.
 - **One login system for everyone.** Better Auth (configured once, in `packages/core/src/auth`) handles customers and staff alike. What differs is the session: does it have an active organization (org member), a platform role (staff), or neither (individual)?
 
 ## How the code is layered

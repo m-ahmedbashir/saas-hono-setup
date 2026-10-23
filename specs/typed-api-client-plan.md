@@ -129,7 +129,7 @@ export type OrganizationBilling = Awaited<ReturnType<typeof getOrganizationBilli
 
 ## Tasks
 
-- [ ] **1. Spike — decides the controller rule.** Export `AppType`, add the portal client, convert
+- [x] **1. Spike — decides the controller rule.** Export `AppType`, add the portal client, convert
       `apps/portal`'s billing service only. Prove with `expectTypeOf` that request and response types
       flow **through our separate `.controller.ts` files**.
   - **If they flow:** keep the controller rule; record the proof in AGENTS.md.
@@ -138,16 +138,16 @@ export type OrganizationBilling = Awaited<ReturnType<typeof getOrganizationBilli
     it's a standing AGENTS.md rule affecting every feature.
   - Also measure editor/typecheck time before vs after; if noticeably slower, use per-feature
     clients.
-- [ ] **2. Envelope helper** in `packages/shared` (typed unwrap + `ApiError`), ported tests.
-- [ ] **3. Portal billing:** delete `features/billing/api/types.ts`; derive any named types.
-- [ ] **4. Admin client** + convert `subscription-plans`, `organizations`, `notifications` (one
+- [x] **2. Envelope helper** in `packages/shared` (typed unwrap + `ApiError`), ported tests.
+- [x] **3. Portal billing:** delete `features/billing/api/types.ts`; derive any named types.
+- [x] **4. Admin client** + convert `subscription-plans`, `organizations`, `notifications` (one
       commit each, each deleting its `types.ts`).
-- [ ] **5. Admin `individuals`:** `AppType` for `apps/api` calls, Better Auth types for
+- [x] **5. Admin `individuals`:** `AppType` for `apps/api` calls, Better Auth types for
       `authClient.admin` calls.
-- [ ] **6. Admin `users` and `staff`:** derive from Better Auth's admin client types (like
+- [x] **6. Admin `users` and `staff`:** derive from Better Auth's admin client types (like
       `apps/portal/src/features/team/types.ts`); delete the hand-written types.
-- [ ] **7. Remove `apiFetch`** once unused.
-- [ ] **8. Docs:** AGENTS.md rule — "frontends get `apps/api` types from `AppType` and Better Auth
+- [x] **7. Remove `apiFetch`** once unused.
+- [x] **8. Docs:** AGENTS.md rule — "frontends get `apps/api` types from `AppType` and Better Auth
       types from its client; never hand-write either" — plus the spike's controller finding; update
       the `apps/admin`/`apps/portal` sections that describe `apiFetch`; README if setup changed;
       CHANGELOG entry text in the PR.
