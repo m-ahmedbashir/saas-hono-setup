@@ -13,7 +13,7 @@ export interface OverviewStats {
   activePlansTotal: number;
 }
 
-export async function getOverviewStats(headers: HeadersInit): Promise<OverviewStats> {
+export async function getOverviewStats(headers: Record<string, string>): Promise<OverviewStats> {
   const [staff, organizations, individuals, plans] = await Promise.all([
     getStaff({ page: 1, limit: 1 }, headers),
     getPlatformOrganizations({ page: 1, limit: 1 }, headers),
@@ -26,7 +26,7 @@ export async function getOverviewStats(headers: HeadersInit): Promise<OverviewSt
     organizationsTotal: organizations.total,
     individualsTotal: individuals.total,
     // No `.total` on the plans response — it's the whole (unpaginated) list already,
-    // see subscription-plans/api/types.ts.
+    // see subscription-plans/api/service.ts.
     activePlansTotal: plans.plans.length,
   };
 }

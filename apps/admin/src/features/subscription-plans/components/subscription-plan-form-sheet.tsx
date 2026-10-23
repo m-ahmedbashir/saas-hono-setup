@@ -17,11 +17,12 @@ import { Icons } from "@/components/icons";
 import { toast } from "sonner";
 import { createSubscriptionPlanMutation, updateSubscriptionPlanMutation } from "../api/mutations";
 import { subscriptionPlanDetailQueryOptions } from "../api/queries";
-import type { SubscriptionPlan } from "../api/types";
+import type { SubscriptionPlan } from "../api/service";
 import {
   subscriptionPlanFormSchema,
   type SubscriptionPlanFormValues,
 } from "../schemas/subscription-plan";
+import { resolvePlanEntitlements } from "@repo/core/billing/entitlements";
 import {
   featureKeys,
   limitKeys,
@@ -44,7 +45,8 @@ function toFormValues(plan?: SubscriptionPlan): SubscriptionPlanFormValues {
   const limits = Object.fromEntries(limitKeys.map((key) => [key, plan?.limits[key] ?? 0]));
 
   return {
-    ownerType: plan?.ownerType ?? "organization",
+    // Stored as plain text; the API only ever writes these two (create is enum-validated).
+    ownerType: plan?.ownerType === "individual" ? "individual" : "organization",
     planId: plan?.planId ?? "",
     organizationId: plan?.organizationId ?? "",
     name: plan?.name ?? "",
@@ -108,8 +110,7 @@ export function SubscriptionPlanFormSheet({
             description: value.description || undefined,
             seatLimit,
             providerPriceId: value.providerPriceId || undefined,
-            features: value.features,
-            limits: value.limits,
+            ...resolvePlanEntitlements(value),
             isActive: value.isActive,
             isDefault: value.isDefault,
           },
@@ -123,8 +124,7 @@ export function SubscriptionPlanFormSheet({
           description: value.description || undefined,
           seatLimit,
           providerPriceId: value.providerPriceId || undefined,
-          features: value.features,
-          limits: value.limits,
+          ...resolvePlanEntitlements(value),
           isActive: value.isActive,
           isDefault: value.isDefault,
         });
