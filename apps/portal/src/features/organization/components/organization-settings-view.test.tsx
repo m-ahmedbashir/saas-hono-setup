@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { getQueryClient } from "@repo/shared/query-client";
+import { organizationKeys } from "../api/queries";
 import { OrganizationSettingsView } from "./organization-settings-view";
 
 // Mocks only I/O: global fetch (apps/api's /organization-profile) and Better Auth's client
@@ -179,6 +180,21 @@ describe("OrganizationSettingsView", () => {
     expect(sentTo("PATCH /organization-profile")).toHaveLength(0);
   });
 
+  it("leaves a fresher refetched profile in the cache when saving with no changes", async () => {
+    const fresher = { ...profile, website: "https://changed-by-someone-else.test" };
+    const user = userEvent.setup();
+    renderView();
+
+    await screen.findByLabelText("Industry");
+    act(() => {
+      getQueryClient().setQueryData(organizationKeys.profile("org_1"), fresher);
+    });
+    await user.click(screen.getByRole("button", { name: /save profile/i }));
+
+    expect(await screen.findByText("Profile updated")).toBeInTheDocument();
+    expect(getQueryClient().getQueryData(organizationKeys.profile("org_1"))).toEqual(fresher);
+  });
+
   it("compares a second save against what the first one saved", async () => {
     routes["PATCH /organization-profile"] = ok({ ...profile, industry: "Robotics" });
     const user = userEvent.setup();
@@ -195,6 +211,28 @@ describe("OrganizationSettingsView", () => {
 
     await waitFor(() => expect(sentTo("PATCH /organization-profile")).toHaveLength(2));
     expect(sentTo("PATCH /organization-profile")[1]).toEqual({ taxId: "DE123" });
+  });
+
+  // Another admin's change arriving via a background refetch must not be overwritten by the
+  // stale value still sitting in this form's untouched field.
+  it("doesn't send back a field another admin changed while this form was open", async () => {
+    routes["PATCH /organization-profile"] = ok({ ...profile, industry: "Robotics" });
+    const user = userEvent.setup();
+    renderView();
+
+    const industry = await screen.findByLabelText("Industry");
+    act(() => {
+      getQueryClient().setQueryData(organizationKeys.profile("org_1"), {
+        ...profile,
+        website: "https://changed-by-someone-else.test",
+      });
+    });
+    await user.clear(industry);
+    await user.type(industry, "Robotics");
+    await user.click(screen.getByRole("button", { name: /save profile/i }));
+
+    await waitFor(() => expect(sentTo("PATCH /organization-profile")).toHaveLength(1));
+    expect(sentTo("PATCH /organization-profile")[0]).toEqual({ industry: "Robotics" });
   });
 
   it("rejects a website that isn't an http(s) address before sending anything", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppForm } from "@/components/ui/tanstack-form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -26,24 +26,29 @@ export function OrganizationProfileForm({
   profile: OrganizationProfile;
 }) {
   const queryClient = useQueryClient();
-  // The last saved profile — the baseline a save is diffed against. A ref, since the form's
-  // onSubmit is created once while `profile` updates after every save. Updated after commit,
-  // not during render, so a render React discards can never change the baseline.
+  // What this form's values started from: the profile it was opened with, then whatever
+  // its own last save returned. Deliberately not the live `profile` prop — a background
+  // refetch can bring in another admin's change while this form still holds the old value,
+  // and diffing against that would send the stale value back over theirs. The form's
+  // defaultValues are frozen to the same snapshot: TanStack Form adopts changed
+  // defaultValues into an untouched form (form-core 1.33.2 FormApi.js), which would let the
+  // fields and this baseline drift apart.
   const saved = useRef(profile);
-  useLayoutEffect(() => {
-    saved.current = profile;
-  }, [profile]);
+  const [initialValues] = useState(() => toProfileFormValues(profile));
   const save = useMutation({
-    mutationFn: (update: OrganizationProfileUpdate) =>
-      Object.keys(update).length === 0
-        ? Promise.resolve(saved.current)
-        : updateOrganizationProfile(update),
-    onSuccess: (updated) =>
-      queryClient.setQueryData(organizationKeys.profile(organizationId), updated),
+    // Nothing changed → no request, and nothing written to the cache (writing the baseline
+    // back could overwrite a fresher profile a background refetch already brought in).
+    mutationFn: async (update: OrganizationProfileUpdate) =>
+      Object.keys(update).length === 0 ? null : updateOrganizationProfile(update),
+    onSuccess: (updated) => {
+      if (!updated) return;
+      saved.current = updated;
+      queryClient.setQueryData(organizationKeys.profile(organizationId), updated);
+    },
   });
 
   const form = useAppForm({
-    defaultValues: toProfileFormValues(profile),
+    defaultValues: initialValues,
     validators: { onSubmit: organizationProfileSchema },
     onSubmit: async ({ value }) => {
       try {
