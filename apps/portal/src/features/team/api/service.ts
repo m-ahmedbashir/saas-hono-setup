@@ -7,7 +7,9 @@ import { roles } from "@repo/core/auth/permissions";
 import { authClient } from "@/lib/auth-client";
 import { describeAuthError, unwrapAuthResult as unwrap } from "@/lib/auth-action";
 
-export type InvitableRole = "member" | "admin";
+// Derived from the shared roles map so a new role is invitable without a second edit here;
+// "owner" is excluded because ownership only changes through transfer-ownership.
+export type InvitableRole = Exclude<keyof typeof roles, "owner">;
 
 export async function inviteMember(input: { email: string; role: InvitableRole }) {
   return unwrap(await authClient.organization.inviteMember(input));
