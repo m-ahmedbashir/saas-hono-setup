@@ -14,7 +14,7 @@ describe("proxy", () => {
     getSessionCookieMock.mockReset();
   });
 
-  it.each(["/profile", "/billing", "/team"])(
+  it.each(["/profile", "/billing", "/team", "/organization/new", "/organization/settings"])(
     "redirects an unauthenticated %s request to /auth/sign-in",
     (path) => {
       getSessionCookieMock.mockReturnValue(null);

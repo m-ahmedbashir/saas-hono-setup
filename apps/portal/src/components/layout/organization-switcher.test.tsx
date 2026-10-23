@@ -9,6 +9,7 @@ import { OrganizationSwitcher } from "./organization-switcher";
 const useListOrganizationsMock = vi.fn();
 const useActiveOrganizationMock = vi.fn();
 const setActiveMock = vi.fn();
+const pushMock = vi.fn();
 
 vi.mock("@/lib/auth-client", () => ({
   authClient: {
@@ -16,6 +17,10 @@ vi.mock("@/lib/auth-client", () => ({
     useActiveOrganization: () => useActiveOrganizationMock(),
     organization: { setActive: (...a: unknown[]) => setActiveMock(...a) },
   },
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushMock }),
 }));
 
 const organizations = [
@@ -42,10 +47,37 @@ beforeEach(() => {
 });
 
 describe("OrganizationSwitcher", () => {
-  it("isn't shown to someone who belongs to no organization", () => {
+  // An individual with no organization still needs a way to start one (specs/
+  // organization-self-serve-plan.md), so the switcher shows for them too.
+  it("offers someone in no organization their personal account and a way to create one", async () => {
     useListOrganizationsMock.mockReturnValue({ data: [] });
+    useActiveOrganizationMock.mockReturnValue({ data: null });
+    renderSwitcher();
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Switch account (current: Personal account)" }),
+    );
+    expect(await screen.findByRole("menuitem", { name: /personal account/i })).toBeInTheDocument();
+    expect(screen.queryByText("Organizations")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("menuitem", { name: /create organization/i }));
+    expect(pushMock).toHaveBeenCalledWith("/organization/new");
+  });
+
+  it("isn't shown while the organization list is still loading", () => {
+    useListOrganizationsMock.mockReturnValue({ data: null });
     renderSwitcher();
     expect(screen.queryByRole("button", { name: /switch account/i })).not.toBeInTheDocument();
+  });
+
+  it("offers to create another organization alongside the existing ones", async () => {
+    renderSwitcher();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /switch account/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /create organization/i }));
+    expect(pushMock).toHaveBeenCalledWith("/organization/new");
   });
 
   it("names the account the portal is currently acting for", () => {

@@ -129,9 +129,9 @@ function NoOrganization() {
   return (
     <EmptyState
       title="Teams are for organizations"
-      body="You're using a personal account. Join an organization through an invitation link to see its team here."
-      href="/billing"
-      action="Go to billing"
+      body="You're using a personal account. Create an organization to invite people, or join one through an invitation link."
+      href="/organization/new"
+      action="Create organization"
     />
   );
 }

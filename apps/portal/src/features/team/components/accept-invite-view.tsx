@@ -9,8 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Icons } from "@/components/icons";
 import { cn } from "@repo/shared/utils";
 import { authClient, useSession } from "@/lib/auth-client";
+import { AuthActionError } from "@/lib/auth-action";
 import {
-  TeamActionError,
   acceptInvitation,
   describeTeamError,
   getInvitation,
@@ -82,7 +82,7 @@ function InvitationDetails({ invitationId, email }: { invitationId: string; emai
 
   if (invitation.isError) {
     const wrongPerson =
-      invitation.error instanceof TeamActionError &&
+      invitation.error instanceof AuthActionError &&
       invitation.error.code === "YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION";
     return wrongPerson ? (
       <Notice

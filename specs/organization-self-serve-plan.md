@@ -122,10 +122,14 @@ const friendlyMessages: Record<string, string> = {
 
 ## Tasks
 
-- [ ] **1. Permissions:** add `organization: ["update", "transfer-ownership"]` to the statement;
+- [x] **1. Permissions:** add `organization: ["update", "transfer-ownership"]` to the statement;
       grant `update` to owner+admin, `transfer-ownership` to owner. Integration tests both ways.
-- [ ] **2. Create organization** page + switcher/empty-state entry points + tests.
-- [ ] **3. Settings page:** rename + profile form + tests.
+      _Done 2026-10-24 (merged). Rename tested both ways; `transfer-ownership` is unit-tested
+      here, and its endpoint tests land with task 4._
+- [x] **2. Create organization** page + switcher/empty-state entry points + tests.
+      _Done 2026-10-24. The switcher now shows for users in no organization, so they can
+      reach "Create organization"._
+- [ ] **3. Settings page:** rename + profile form + tests. _In progress — next up._
 - [ ] **4. Transfer ownership** endpoint (test-first) + dialog.
 - [ ] **5. Danger zone:** leave + delete + tests.
 - [ ] **6. Docs:** AGENTS.md (new permissions, transfer-ownership endpoint), README if anything
