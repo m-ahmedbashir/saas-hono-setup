@@ -201,6 +201,34 @@ describe("PATCH /organization-profile", () => {
     expect(body.data.orgNumber).toBe(originalOrgNumber);
     expect(body.data.orgNumber).not.toBe("HACKED00");
   }, 15000);
+
+  // z.string().url() alone accepts "javascript:alert(1)" — and the website is rendered as a
+  // link (apps/admin, apps/portal), so anything but http(s) must be refused at the boundary.
+  it.each(["javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "ftp://example.com"])(
+    "refuses a non-http(s) website (%s) with 422 and leaves the profile unchanged",
+    async (website) => {
+      const owner = await signUp(`org-profile-scheme-${Date.now()}@example.com`);
+      cleanupUserIds.push(owner.userId);
+      const orgId = await createOrg(owner.cookie, "Scheme Org");
+      cleanupOrgIds.push(orgId);
+
+      const res = await fetch(`http://localhost:${PORT}/organization-profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: owner.cookie },
+        body: JSON.stringify({ website }),
+      });
+      const body = (await res.json()) as { success: boolean; error: { code: string } };
+      expect(res.status).toBe(422);
+      expect(body.error.code).toBe("VALIDATION_ERROR");
+
+      const after = await fetch(`http://localhost:${PORT}/organization-profile`, {
+        headers: { Origin: ORIGIN, Cookie: owner.cookie },
+      });
+      const afterBody = (await after.json()) as { data: { website: string | null } };
+      expect(afterBody.data.website).toBeNull();
+    },
+    15000,
+  );
 });
 
 describe("ensureOrganizationProfileRow under concurrency", () => {

@@ -129,8 +129,11 @@ const friendlyMessages: Record<string, string> = {
 - [x] **2. Create organization** page + switcher/empty-state entry points + tests.
       _Done 2026-10-24. The switcher now shows for users in no organization, so they can
       reach "Create organization"._
-- [ ] **3. Settings page:** rename + profile form + tests. _In progress — next up._
-- [ ] **4. Transfer ownership** endpoint (test-first) + dialog.
+- [x] **3. Settings page:** rename + profile form + tests.
+      _Done 2026-10-24. `/organization/settings`, reached from an "Organization" nav link
+      shown while an org is active. Members see the same fields read-only. The profile
+      save sends only changed fields. apps/api now refuses a non-http(s) `website` (422)._
+- [ ] **4. Transfer ownership** endpoint (test-first) + dialog. _In progress — next up._
 - [ ] **5. Danger zone:** leave + delete + tests.
 - [ ] **6. Docs:** AGENTS.md (new permissions, transfer-ownership endpoint), README if anything
       user-facing in setup changed, CHANGELOG entry text in the PR.

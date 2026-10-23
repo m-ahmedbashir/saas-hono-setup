@@ -5,6 +5,7 @@
 // /organization/* call), so only writes live here.
 import { roles } from "@repo/core/auth/permissions";
 import { authClient } from "@/lib/auth-client";
+import { roleCan } from "@/lib/permissions";
 import { describeAuthError, unwrapAuthResult as unwrap } from "@/lib/auth-action";
 
 // Derived from the shared roles map so a new role is invitable without a second edit here;
@@ -27,26 +28,9 @@ export async function updateMemberRole(input: { memberId: string; role: Invitabl
   return unwrap(await authClient.organization.updateMemberRole(input));
 }
 
-/**
- * Whether a member with this role may invite/remove people and change roles — checked
- * against the same `roles` map the server enforces with (`Role.authorize()`, exactly what
- * apps/api's requirePermission runs), never by comparing role names. Takes the caller's
- * role from the live member list rather than calling /organization/has-permission: that's
- * no network round trip (and no extra full-organization refetch, which every
- * /organization/* call triggers in Better Auth's client), and it can't go stale — the
- * member list refreshes itself after any role change. UX gating only; the server checks
- * every action regardless. A member can hold several comma-separated roles; any one that
- * grants it is enough, same as on the server.
- */
+/** Whether a member with this role may invite/remove people and change roles (see roleCan). */
 export function canManageTeam(role: string | undefined): boolean {
-  if (!role) return false;
-  return role.split(",").some(
-    (name) =>
-      roles[name.trim() as keyof typeof roles]?.authorize({
-        invitation: ["create", "cancel"],
-        member: ["update", "delete"],
-      }).success === true,
-  );
+  return roleCan(role, { invitation: ["create", "cancel"], member: ["update", "delete"] });
 }
 
 export async function getInvitation(invitationId: string) {

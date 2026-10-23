@@ -29,6 +29,8 @@ const BASE_LINKS = [
   { href: "/billing", label: "Billing" },
 ];
 const TEAM_LINK = { href: "/team", label: "Team" };
+// Only while an organization is active — its settings act on the active one.
+const ORGANIZATION_LINK = { href: "/organization/settings", label: "Organization" };
 
 export function PortalNav() {
   const pathname = usePathname();
@@ -38,7 +40,11 @@ export function PortalNav() {
   const { data: organizations } = authClient.useListOrganizations();
   const user = session?.user;
   const hasOrganization = Boolean(activeOrganization) || (organizations?.length ?? 0) > 0;
-  const navLinks = hasOrganization ? [...BASE_LINKS, TEAM_LINK] : BASE_LINKS;
+  const navLinks = [
+    ...BASE_LINKS,
+    ...(hasOrganization ? [TEAM_LINK] : []),
+    ...(activeOrganization ? [ORGANIZATION_LINK] : []),
+  ];
 
   return (
     <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40 border-b backdrop-blur">

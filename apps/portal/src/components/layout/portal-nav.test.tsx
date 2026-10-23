@@ -60,4 +60,19 @@ describe("PortalNav", () => {
     renderNav();
     expect(screen.getByRole("link", { name: "Team" })).toBeInTheDocument();
   });
+
+  // Settings act on the *active* organization, so the link only makes sense while one is.
+  it("links to organization settings only while an organization is active", () => {
+    useListOrganizationsMock.mockReturnValue({ data: [{ id: "org_1", name: "Acme" }] });
+    const { unmount } = renderNav();
+    expect(screen.queryByRole("link", { name: "Organization" })).not.toBeInTheDocument();
+    unmount();
+
+    useActiveOrganizationMock.mockReturnValue({ data: { id: "org_1", name: "Acme" } });
+    renderNav();
+    expect(screen.getByRole("link", { name: "Organization" })).toHaveAttribute(
+      "href",
+      "/organization/settings",
+    );
+  });
 });

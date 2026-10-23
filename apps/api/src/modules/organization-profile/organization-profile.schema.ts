@@ -28,7 +28,17 @@ const addressSchema = z
 export const updateOrganizationProfileSchema = z.object({
   industry: z.string().max(100).nullable().optional(),
   companySize: z.string().max(50).nullable().optional(),
-  website: z.string().url().max(500).nullable().optional(),
+  // http(s) only: .url() alone accepts javascript:/data: URLs, and the website is rendered
+  // as a link in both frontends. Checked on the parsed protocol (valid once .url() passes).
+  website: z
+    .string()
+    .url()
+    .max(500)
+    .refine((value) => ["http:", "https:"].includes(new URL(value).protocol), {
+      message: "Website must start with http:// or https://",
+    })
+    .nullable()
+    .optional(),
   phone: phoneSchema.optional(),
   taxId: z.string().max(50).nullable().optional(),
   description: z.string().max(2000).nullable().optional(),
