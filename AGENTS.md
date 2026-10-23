@@ -233,6 +233,24 @@ A handful of concurrency/load-bearing fixes, closed after a load-focused audit (
 - **Stripe checkout accepts a caller-supplied idempotency key** (`BillingGateway.createCheckoutSession`/`createIndividualCheckoutSession`'s optional `idempotencyKey` param, read from an `Idempotency-Key` request header in `billing.controller.ts`) — verified against the installed Stripe SDK's actual source (`RequestSender.js`'s `_defaultIdempotencyKey`) that it already auto-generates a fresh key per call when none is supplied; that only protects the SDK's _own_ internal network-retry, not a retried HTTP request to _our_ API, since a new inbound request looks identical to the server either way. A server-generated key would have added nothing beyond what the SDK already does. Optional and additive — callers that don't send the header get today's behavior unchanged.
 - **`requirePermission` no longer calls `auth.api.hasPermission(...)`** — a genuinely redundant DB round-trip, not a caching shortcut. Traced Better Auth's actual source before changing this (`has-permission.mjs` → `permission.mjs`'s `hasPermissionFn` → `access.d.mts`'s `Role.authorize()`): the real permission check is a pure, synchronous, in-memory function on a `Role` object — the DB cost was entirely in re-deriving the session and re-fetching the member's role, both of which `injectUserContext` already resolved earlier in the exact same request (`userContext.roles`). `requirePermission` now calls the same `Role.authorize()` directly via `roles` (`packages/core/src/auth/permissions.ts`, now also the single source the `organization` plugin's own config uses, replacing a duplicated inline object). **This is not the same class of change as a cross-request cache** — it introduces zero staleness risk, since it reuses data fetched moments earlier in the same request rather than holding anything across requests. Session/role freshness for `injectUserContext` itself is untouched; don't extend this pattern to actually cache session/role data _across_ requests without treating that as the separate, real security-freshness tradeoff it would be.
 
+## Email
+
+`EmailSender` (`packages/core/src/email/types.ts`) is a transport, not a notification. `apps/api` registers the implementation at startup (`lib/auth-wiring.ts` → `modules/email/select-email-sender.ts`): Resend when `RESEND_API_KEY` is set, otherwise the console sender, except in production, which gets **no** sender. Same interface-in-core split as `BillingGateway`; see specs/email-and-account-recovery-plan.md.
+
+- **Auth emails call `sendEmail` directly, never through notifications.** They carry one-time tokens, and notifications are persisted and shown in the in-app inbox. They also go to people with no account or an unverified email. A future email notification channel calls the same `EmailSender`.
+- **`sendEmail` never rejects.** With no sender it warns and drops; a failing sender is logged by subject only, never the recipient or body, so tokens never reach the logs. A missing or broken provider can't break sign-up, invites or a reset request.
+- **Better Auth hooks fire the send and return, never `await` it** (`packages/core/src/auth/emails.ts`). Better Auth 1.7.12 awaits all three hooks (`password.mjs`, `sign-up.mjs` / `email-verification.mjs`, `crud-invites.mjs`). Awaiting delivery in the reset hook makes a known address answer measurably slower than an unknown one. `email.integration.test.ts` proves it with a sender that never delivers.
+- **Every link comes from config, never the request** (`packages/core/src/auth/urls.ts`):
+  - reset → `${PORTAL_URL}/auth/reset-password?token=`;
+  - invitation → `${PORTAL_URL}/auth/accept-invite?id=`, kept in sync with the portal's `acceptInvitePath`;
+  - verification → Better Auth's own `/verify-email` URL, with its client-supplied `callbackURL` replaced by `${PORTAL_URL}/auth/email-verified`.
+
+  `PORTAL_URL` and `BETTER_AUTH_URL` are checked once at startup, required and `https://` in production. Never fail per request: that would make known and unknown addresses answer differently.
+
+- **`resend` is imported only in `modules/email/resend-email.sender.ts`.** Resend returns API errors instead of throwing, and the adapter turns them into rejections. The console sender prints links by design, which is why it's never picked in production.
+- Templates are plain functions returning `{ subject, html, text }` (`packages/core/src/email/templates.ts`), always with a text part. They escape every interpolated value: org and inviter names are user-controlled and land in someone else's inbox.
+- `requireEmailVerification` stays off; turning it on would lock out existing unverified accounts and needs its own rollout decision. Resending verification is rate-limited at 3/min (`rate-limit.ts`).
+
 ## API response shape
 
 Every `apps/api` response — except `/health`, `/api/auth/**` (Better Auth's own client SDK expects its native shape), and `/billing/webhook` (Stripe only checks HTTP status) — uses one envelope via `apps/api/src/lib/response.ts`:
@@ -283,7 +301,14 @@ Customer-facing Next.js app (B2B org members + B2C individuals), same stack and 
 - **Organization data comes from Better Auth's reactive hooks, not React Query.** `useActiveOrganization()` (members, invitations) refetches itself after every `/organization/*` call — verified in the installed `client.mjs` `atomListeners` — so team changes need no manual invalidation. React Query is for `apps/api` data (billing), with organization-scoped data keyed by `organizationId` so an org switch can never show the previous org's cache.
 - **Better Auth errors keep their `code`** (`features/team/api/service.ts`'s `TeamActionError`), and the UI maps known codes (`INVITATION_LIMIT_REACHED`, `ORGANIZATION_MEMBERSHIP_LIMIT_REACHED`, …) to plain-language messages instead of showing raw ones.
 - **`?redirect=` on sign-in/sign-up is untrusted input** — always pass it through `src/lib/safe-redirect.ts`'s `safeRedirectPath` (same-site paths only), never to `router.push` directly, or it becomes an open redirect.
-- **Invitations are shareable links, not emails** (no email provider yet): `/auth/accept-invite?id=…`. Better Auth only reveals an invitation to a signed-in user whose email matches it, so that page sends signed-out visitors through sign-in/sign-up and back. `proxy.ts` deliberately lets signed-in users reach it (accepting an invite to a second org).
+- **Invitations are emailed and shareable as links**: `/auth/accept-invite?id=…`. Better Auth only reveals an invitation to a signed-in user whose email matches it, so that page sends signed-out visitors through sign-in/sign-up and back.
+- **`proxy.ts` lets signed-in users reach three `/auth` pages** (`AUTH_PATHS_OPEN_WHEN_SIGNED_IN`):
+  - `accept-invite`, for accepting an invite to a second org;
+  - `reset-password`, where the emailed token, not the session, decides the account;
+  - `email-verified`, because verifying signs the user in.
+
+  Every other `/auth` page bounces a signed-in user to `/profile`. A new emailed-link landing page belongs in that list, with a proxy test.
+
 - **Known upstream limit:** with `membershipLimit` set to a function (our seat limits), Better Auth's `get-full-organization` caps its member→user lookup at 100, so an uncapped organization past 100 members would fail to load its member list. No current plan allows that many (largest cap: 50); revisit before offering one that does.
 
 ## CI/CD

@@ -6,6 +6,13 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ### Added
 
+- **Email and account recovery** (`specs/email-and-account-recovery-plan.md`):
+  - **Forgot / reset password.** The sign-in page's "Forgot password?" link now goes to `/auth/forgot-password`. The emailed link opens `/auth/reset-password` and works once, for 1 hour. The request answers identically whether or not the address has an account, and a reset link opened in a signed-in browser works too.
+  - **Email verification.** Sign-up sends a verification email. Signed-in, unverified users see a dismissible "Verify your email" notice with a resend button, limited to 3 per minute. The link lands on `/auth/email-verified`, which also explains an expired, used or mismatched link. Verification is offered, not required.
+  - **Invitation emails.** Invitees get an email linking to the accept-invite page. Owners can still share the link themselves.
+  - **Configuration.** Emails go through Resend once `RESEND_API_KEY` and `EMAIL_FROM` are set. Until then they're printed to the API log in dev, and not sent in production. `PORTAL_URL` and `BETTER_AUTH_URL` must be `https://` in production.
+- **Local integration tests run against Docker** (`pnpm test:db`): the same `postgres:16` CI uses, so the API suite takes about a minute instead of about ten against the shared dev database.
+
 - **Production rate limiting on sign-in, sign-up and password reset**: sign-in and reset 5 per minute per client, sign-up 3 per minute. Counters live in the database, so the limit holds across API instances. The client IP comes from `cf-connecting-ip` (the API runs behind Cloudflare), so **the origin must accept Cloudflare traffic only** (README's Deployment notes). Adds Better Auth's generated `rate_limit` table (migration `0021`), plus an index on `last_request` (`0022`) so Better Auth's cleanup query doesn't scan the table during sign-in.
 
 ### Security
