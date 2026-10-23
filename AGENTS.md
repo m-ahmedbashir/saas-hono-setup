@@ -249,7 +249,9 @@ Two patterns — use the cheaper one whenever it answers the question:
 - **Pure unit** (e.g. `lib/response.test.ts`) — standalone `Hono` instance, driven by `testClient` from `hono/testing`, no real socket/DB. For anything not needing a real session/DB row.
 - **Integration** (`*.integration.test.ts`) — import the real `app`, boot with `serve()` on a dedicated port, exercise with real HTTP/WS clients against the real database. Required when the thing under test is a security boundary or needs a real Better Auth session. Every integration test cleans up what it creates in `afterAll`, unconditionally.
 - Both patterns exercise the real app/route/middleware code, never a re-implementation.
-- No isolated test database exists yet — integration tests run against the dev DB, relying on strict self-cleanup. Check PROGRESS.md before assuming otherwise.
+- **Run integration tests against the local Docker database** (`docker-compose.yml`, `pnpm test:db`; README's "Running the API's integration tests"). `apps/api/vitest.setup.ts` loads `.env.test` before `.env.development`, and `process.loadEnvFile` never overwrites a set variable, so `.env.test`'s database URLs win. Without a `.env.test`, tests fall back to the dev database. Tests still clean up after themselves either way: the container lives for many runs, and the dev-DB fallback is shared.
+  - **`.env.test`'s `APP_DATABASE_URL` must be `app_user`, never `postgres`.** The superuser bypasses Row-Level Security, so every RLS test would pass without proving anything. `pnpm test:db` creates `app_user` before migrating, the same order as CI.
+  - Integration files still run one at a time (`fileParallelism: false`): they share one database and fixed ports.
 
 ## apps/admin
 

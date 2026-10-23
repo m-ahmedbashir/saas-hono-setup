@@ -76,6 +76,19 @@ curl -X POST http://localhost:8787/api/auth/sign-up/email \
   -d '{"email":"you@example.com","password":"password1234","name":"Your Name"}'
 ```
 
+### Running the API's integration tests
+
+They need a real Postgres. Use the local Docker one: it's the same `postgres:16` CI runs, it's several times faster than a remote database, and test data never lands in your dev database.
+
+```bash
+cp .env.test.example .env.test   # database URLs only; the rest still comes from .env.development
+pnpm test:db                     # start the container (docker-compose.yml), create app_user, migrate, seed plans
+pnpm --filter @repo/api test
+pnpm test:db:down                # stop it when you're done
+```
+
+The container keeps its data in memory, so run `pnpm test:db` again after it stops or Docker restarts. Without a `.env.test`, the tests use `.env.development`'s database instead.
+
 ## Environment variables
 
 See `.env.example` for the full list with comments. Summary:
@@ -160,18 +173,20 @@ Every route in `apps/api` (except `/health` and the `/api/auth/**` proxy, which 
 
 Run from the repo root (fans out via Turborepo) or scoped with `--filter @repo/api`:
 
-| Script              | What it does                                              |
-| ------------------- | --------------------------------------------------------- |
-| `pnpm dev`          | Start every app (fans out via Turborepo)                  |
-| `pnpm build`        | Compile all packages                                      |
-| `pnpm test`         | Run tests                                                 |
-| `pnpm typecheck`    | `tsc --noEmit` across the monorepo                        |
-| `pnpm lint`         | Run ESLint across all workspaces                          |
-| `pnpm lint:fix`     | Run ESLint with `--fix`                                   |
-| `pnpm format`       | Format all files with Prettier                            |
-| `pnpm format:check` | Check that all files are formatted                        |
-| `pnpm db:generate`  | Generate a SQL migration from `packages/db/src/schema.ts` |
-| `pnpm db:migrate`   | Apply pending migrations to `DATABASE_URL`                |
+| Script              | What it does                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------ |
+| `pnpm dev`          | Start every app (fans out via Turborepo)                                                   |
+| `pnpm build`        | Compile all packages                                                                       |
+| `pnpm test`         | Run tests                                                                                  |
+| `pnpm typecheck`    | `tsc --noEmit` across the monorepo                                                         |
+| `pnpm lint`         | Run ESLint across all workspaces                                                           |
+| `pnpm lint:fix`     | Run ESLint with `--fix`                                                                    |
+| `pnpm format`       | Format all files with Prettier                                                             |
+| `pnpm format:check` | Check that all files are formatted                                                         |
+| `pnpm db:generate`  | Generate a SQL migration from `packages/db/src/schema.ts`                                  |
+| `pnpm db:migrate`   | Apply pending migrations to `DATABASE_URL`                                                 |
+| `pnpm test:db`      | Start the local Docker test database, create `app_user`, migrate and seed it (`.env.test`) |
+| `pnpm test:db:down` | Stop the local Docker test database                                                        |
 
 ## CI
 

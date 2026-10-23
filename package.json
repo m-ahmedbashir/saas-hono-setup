@@ -18,7 +18,9 @@
     "format:check": "prettier --check .",
     "db:generate": "pnpm --filter @repo/db generate",
     "db:migrate": "pnpm --filter @repo/db migrate",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:db": "docker compose up -d --wait test-db && pnpm --filter @repo/db create-app-role:test && pnpm --filter @repo/db migrate:test && pnpm --filter @repo/api seed:subscription-plans:test",
+    "test:db:down": "docker compose down"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

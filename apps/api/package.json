@@ -15,7 +15,8 @@
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "seed:admin": "tsx --env-file=../../.env.development scripts/seed-admin.ts",
-    "seed:subscription-plans": "tsx --env-file=../../.env.development scripts/seed-subscription-plans.ts"
+    "seed:subscription-plans": "tsx --env-file=../../.env.development scripts/seed-subscription-plans.ts",
+    "seed:subscription-plans:test": "tsx --env-file=../../.env.development --env-file=../../.env.test scripts/seed-subscription-plans.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.17",
