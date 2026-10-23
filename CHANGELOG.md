@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ### Added
 
-- **Production rate limiting on sign-in, sign-up and password reset**: sign-in and reset 5 per minute per client, sign-up 3 per minute. Counters live in the database, so the limit holds across API instances. The client IP comes from `cf-connecting-ip` (the API runs behind Cloudflare), so **the origin must accept Cloudflare traffic only** (README's Deployment notes). Adds Better Auth's generated `rateLimit` table.
+- **Production rate limiting on sign-in, sign-up and password reset**: sign-in and reset 5 per minute per client, sign-up 3 per minute. Counters live in the database, so the limit holds across API instances. The client IP comes from `cf-connecting-ip` (the API runs behind Cloudflare), so **the origin must accept Cloudflare traffic only** (README's Deployment notes). Adds Better Auth's generated `rate_limit` table (migration `0021`), plus an index on `last_request` (`0022`) so Better Auth's cleanup query doesn't scan the table during sign-in.
 
 ### Security
 
@@ -14,7 +14,8 @@ All notable changes to this project are documented here. Format loosely follows 
   - `next` 16.4.2 and `sharp` 0.35.5 (both frontends): the RCE, proxy-bypass, SSRF and cache-poisoning advisories, plus the libvips/libheif/librsvg CVEs.
   - `hono` 4.13.13 (still one exact pin in all four packages) and `@hono/node-server` 1.19.17: ReDoS in the CORS middleware we use, and parser fixes.
   - `drizzle-orm` 0.45.4 and `drizzle-kit` 0.31.11: SQL injection through badly escaped identifiers. Also clears `shell-quote`'s command injection.
-  - `better-auth` 1.7.12, one exact pin everywhere, with `zod` 4.6.7. Session lookup errors are no longer treated as signed out, and concurrent requests can no longer exceed database rate limits. Installed a day before its 3-day release age, by explicit decision, through a version-pinned `minimumReleaseAgeExclude` entry that comes out once it matures.
+  - `better-auth` 1.7.12, one exact pin everywhere, with `zod` 4.6.7. Session lookup errors are no longer treated as signed out, and concurrent requests can no longer exceed database rate limits. Installed a day before its 3-day release age, by explicit decision, through a version-pinned `minimumReleaseAgeExclude` entry. The entry has since been removed, so the 3-day rule applies to everything again.
+  - `postcss` 8.5.23 (both frontends; it was pinned to 8.5.14), with `nanoid` 3.3.20 and `source-map-js` 1.2.2 refreshed inside their parents' ranges. These were the last high advisories in production dependencies: source-map path traversal and related issues in the PostCSS/Tailwind chain.
   - Dev tooling: `vitest` 4.1.12, `vite` 6.4.4, `@vitejs/plugin-react` 4.7.0. Clears the tinypool RCE gadgets, Vitest UI file read, mocker path traversal, and Vite's Windows `fs.deny` / `launch-editor` advisories.
   - Removed unused template packages from `apps/admin` (`@faker-js/faker`, `sort-by`), its demo sales card, and its only remote image host.
 - **pnpm refuses versions published less than 3 days ago** (`minimumReleaseAge`), so a hijacked release can't be installed before it's caught. Node's floor rises to 22.23.4.

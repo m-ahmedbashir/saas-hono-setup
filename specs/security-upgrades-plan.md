@@ -199,33 +199,33 @@ The numbers are placeholders until Open question 2 is answered.
 
 Each task is its own small PR from `develop`, in this order.
 
-- [ ] **0. Guard rails (tiny).**
+- [x] **0. Guard rails (tiny).**
   - Root `package.json` `engines.node`: `>=22` → `>=22.23.4` (Node's latest security release).
   - `pnpm-workspace.yaml`: `minimumReleaseAge: 4320` (3 days, in minutes; pnpm 10.16+, we run
     10.30.3) so `pnpm add`/`install` refuses versions younger than that. If an emergency patch is
     newer, add it to `minimumReleaseAgeExclude` temporarily, with a comment, and remove it later.
 
-- [ ] **1. Next.js + sharp (urgent).** Update `next` and `@next/eslint-plugin-next` to 16.4.2 in
+- [x] **1. Next.js + sharp (urgent).** Update `next` and `@next/eslint-plugin-next` to 16.4.2 in
       both apps, and `sharp` to 0.35.5. Ship this first. **If anything is deployed, do this
       today**, before any other work.
-- [ ] **2. Hono.** Update `hono` to 4.13.13 in all four packages (exact pin) and
+- [x] **2. Hono.** Update `hono` to 4.13.13 in all four packages (exact pin) and
       `@hono/node-server` to 1.19.17. Keep the `client-types` type test green.
-- [ ] **3. Remove unused template packages** from admin: `@faker-js/faker`, `sort-by`,
+- [x] **3. Remove unused template packages** from admin: `@faker-js/faker`, `sort-by`,
       `@types/sort-by`. First confirm nothing imports them, including scripts.
-- [ ] **4. Drizzle.** Update `drizzle-orm` to 0.45.4 and `drizzle-kit` to 0.31.11; check the
+- [x] **4. Drizzle.** Update `drizzle-orm` to 0.45.4 and `drizzle-kit` to 0.31.11; check the
       generated output for no drift, and run the RLS and savepoint checks. Read drizzle's
       changelog from 0.39 to 0.45 for breaking changes first.
-- [ ] **5. Dev tooling.** Update `vitest` (every package), `vite` and `@vitejs/plugin-react`.
+- [x] **5. Dev tooling.** Update `vitest` (every package), `vite` and `@vitejs/plugin-react`.
       Handle the remaining transitive advisories (eslint's `brace-expansion` and others), using
       overrides only where a parent bump can't clear them.
-- [ ] **6. Better Auth 1.7.12 + zod.** Run the duplicate-account check, pin the exact version in
+- [x] **6. Better Auth 1.7.12 + zod.** Run the duplicate-account check, pin the exact version in
       core, admin and portal, bump zod, regenerate the schema, re-verify the AGENTS.md facts and
       run all tests. Behaviour should not change.
-- [ ] **7. Rate limiting.** Set `storage: "database"` and `customRules`, plus the IP header
+- [x] **7. Rate limiting.** Set `storage: "database"` and `customRules`, plus the IP header
       config once Open question 1 is answered. Generate the table, migrate, and add the
       integration test. This replaces task 4 of
       [account-security-and-settings-plan.md](./account-security-and-settings-plan.md).
-- [ ] **8. Docs.** Update AGENTS.md (versions, re-verified facts, the CLI command, the
+- [x] **8. Docs.** Update AGENTS.md (versions, re-verified facts, the CLI command, the
       rate-limit section), README (anything changed in setup) and the CHANGELOG entry text in
       each PR.
 
@@ -263,13 +263,9 @@ Each task is its own small PR from `develop`, in this order.
 
 ## Open questions
 
-1. **Hosting and client IP.** Where will the API run (Fly, Railway, Render, a VPS behind Nginx,
-   Cloudflare)? That decides which header carries the real client IP
-   (`advanced.ipAddress.ipAddressHeaders`). It must be set before rate limiting goes live.
-2. **Rate-limit numbers.** Suggested: 5 per minute per client for sign-in and reset, 3 per
-   minute for sign-up (carried over from the account-security spec).
-3. **Keep it from happening again.** Add `pnpm audit --prod --audit-level high` to CI and turn on
-   Dependabot or Renovate security updates? Recommended. The audit step fails a PR when a new
-   high or critical advisory lands in a production dependency.
-4. **Admin's `images.remotePatterns` (`api.slingacademy.com`)** is used only by the template's
-   demo `recent-sales.tsx`. Remove both to shrink the image-optimization surface?
+All answered 2026-10-23; the spec is implemented and merged to `main`.
+
+1. **Hosting and client IP.** Cloudflare (free plan) in front of a managed Node host, with the origin locked to Cloudflare. Rate limiting trusts `cf-connecting-ip`; see README's Deployment notes. The Node host itself is still to be picked.
+2. **Rate-limit numbers.** The suggested defaults: sign-in and reset 5/min, sign-up 3/min.
+3. **Keep it from happening again.** Yes, both: CI runs `pnpm audit --prod --audit-level high`, and `.github/dependabot.yml` opens security-update PRs only. "Dependabot security updates" still has to be switched on in the repository settings.
+4. **Admin's `images.remotePatterns`.** Removed, along with the demo `recent-sales.tsx` (task 3).
