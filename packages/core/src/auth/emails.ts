@@ -4,15 +4,22 @@ import { resetPasswordEmail, sendEmail } from "../email";
 // own `url`, whose callbackURL comes from the client, and never from request headers.
 // Resolved once at startup: a per-request failure inside a hook would make known and
 // unknown addresses answer differently, so a production misconfiguration fails at boot.
-const portalUrl = resolvePortalUrl();
+const portalUrl = resolvePortalUrl(process.env);
 
-function resolvePortalUrl(): string {
-  const configured = process.env.PORTAL_URL?.replace(/\/+$/, "");
-  if (configured) return configured;
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("PORTAL_URL must be set in production — auth emails link to the portal.");
+export function resolvePortalUrl(env: NodeJS.ProcessEnv): string {
+  const configured = env.PORTAL_URL?.replace(/\/+$/, "");
+  const production = env.NODE_ENV === "production";
+  if (!configured) {
+    if (production) {
+      throw new Error("PORTAL_URL must be set in production — auth emails link to the portal.");
+    }
+    return "http://localhost:3002";
   }
-  return "http://localhost:3002";
+  // The links carry one-time tokens; over plain http anyone on the path could read them.
+  if (production && !configured.startsWith("https://")) {
+    throw new Error("PORTAL_URL must use https:// in production.");
+  }
+  return configured;
 }
 
 function portalLink(path: string, params: Record<string, string>): string {
