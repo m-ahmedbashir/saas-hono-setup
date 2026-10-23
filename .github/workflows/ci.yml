@@ -97,6 +97,7 @@ jobs:
           PORT=8787
           STRIPE_WEBHOOK_SECRET=whsec_test_secret_for_ci_only
           BILLING_CHECKOUT_RETURN_URL=http://localhost:3002/billing
+          PORTAL_URL=http://localhost:3002
           EOF
 
       - name: Create restricted app_user role
