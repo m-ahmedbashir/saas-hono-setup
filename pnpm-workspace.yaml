@@ -5,15 +5,3 @@ packages:
 # Refuse package versions published less than 3 days ago (in minutes): a hijacked
 # maintainer account's malicious release is usually caught and pulled within days.
 minimumReleaseAge: 4320
-# TEMPORARY, approved 2026-10-23: better-auth 1.7.12 (published 2026-10-20 12:00 UTC) ahead
-# of its 3-day age. Remove once it's past 2026-10-23 12:02 UTC — nothing else belongs here.
-minimumReleaseAgeExclude:
-  - better-auth@1.7.12
-  - "@better-auth/core@1.7.12"
-  - "@better-auth/telemetry@1.7.12"
-  - "@better-auth/drizzle-adapter@1.7.12"
-  - "@better-auth/kysely-adapter@1.7.12"
-  - "@better-auth/memory-adapter@1.7.12"
-  - "@better-auth/mongo-adapter@1.7.12"
-  - "@better-auth/prisma-adapter@1.7.12"
-  - auth@1.7.12
