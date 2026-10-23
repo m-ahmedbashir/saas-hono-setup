@@ -49,6 +49,35 @@ async function createOrg(ownerCookie: string, name: string) {
   return org.id;
 }
 
+async function addMemberAndActivate(
+  orgId: string,
+  person: { userId: string; cookie: string },
+  role: "admin" | "member",
+) {
+  await auth.api.addMember({ body: { userId: person.userId, role, organizationId: orgId } });
+  await fetch(`http://localhost:${PORT}/api/auth/organization/set-active`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: person.cookie },
+    body: JSON.stringify({ organizationId: orgId }),
+  });
+}
+
+async function renameOrg(cookie: string, orgId: string, name: string) {
+  return fetch(`http://localhost:${PORT}/api/auth/organization/update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: cookie },
+    body: JSON.stringify({ organizationId: orgId, data: { name } }),
+  });
+}
+
+async function orgName(orgId: string) {
+  const [row] = await db
+    .select({ name: organizationTable.name })
+    .from(organizationTable)
+    .where(eq(organizationTable.id, orgId));
+  return row?.name;
+}
+
 beforeAll(() => {
   server = serve({ fetch: app.fetch, port: PORT });
 });
@@ -142,4 +171,32 @@ describe("DELETE /organization", () => {
     const [memberRow] = await db.select().from(userTable).where(eq(userTable.id, member.userId));
     expect(memberRow).toBeDefined();
   }, 15000);
+});
+
+// Better Auth's /organization/update checks { organization: ["update"] } (verified in the
+// installed 1.7.12 crud-org.mjs) — before that permission existed, even an owner was refused.
+describe("POST /api/auth/organization/update (rename)", () => {
+  it("lets the owner and an admin rename the organization, and refuses a plain member", async () => {
+    const stamp = Date.now();
+    const owner = await signUp(`org-rename-owner-${stamp}@example.com`);
+    const admin = await signUp(`org-rename-admin-${stamp}@example.com`);
+    const member = await signUp(`org-rename-member-${stamp}@example.com`);
+    cleanupUserIds.push(owner.userId, admin.userId, member.userId);
+    const orgId = await createOrg(owner.cookie, "Rename Org");
+    cleanupOrgIds.push(orgId);
+    await addMemberAndActivate(orgId, admin, "admin");
+    await addMemberAndActivate(orgId, member, "member");
+
+    const byOwner = await renameOrg(owner.cookie, orgId, "Renamed By Owner");
+    expect(byOwner.status).toBe(200);
+    expect(await orgName(orgId)).toBe("Renamed By Owner");
+
+    const byAdmin = await renameOrg(admin.cookie, orgId, "Renamed By Admin");
+    expect(byAdmin.status).toBe(200);
+    expect(await orgName(orgId)).toBe("Renamed By Admin");
+
+    const byMember = await renameOrg(member.cookie, orgId, "Renamed By Member");
+    expect(byMember.status).toBe(403);
+    expect(await orgName(orgId)).toBe("Renamed By Admin");
+  }, 20000);
 });

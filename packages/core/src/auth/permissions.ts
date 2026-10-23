@@ -5,10 +5,11 @@ export const statement = {
   exercise: ["create", "read", "update", "delete"],
   billing: ["manage"],
   organizationProfile: ["manage"],
-  // Owner-only, not granted to adminRole — permanently destroying the organization (and
-  // every member's access to it) is more severe than anything organizationProfile:manage
-  // covers, so it gets its own, stricter permission rather than reusing that one.
-  organization: ["delete"],
+  // `update` (owner+admin) is what Better Auth's own /organization/update checks to rename
+  // (verified in the installed 1.7.12 crud-org.mjs) — without it even an owner is refused.
+  // `delete` and `transfer-ownership` are owner-only: destroying the organization or
+  // handing it over is more severe than anything organizationProfile:manage covers.
+  organization: ["update", "delete", "transfer-ownership"],
   // Mirrors Better Auth's own default org statement's `member`/`invitation` resources
   // (verified against the installed plugin's access/statement.mjs) — this custom
   // statement REPLACED the plugin's defaults entirely (see the doc comment on ownerRole
@@ -34,6 +35,7 @@ export const adminRole = accessControl.newRole({
   exercise: ["create", "read", "update", "delete"],
   billing: ["manage"],
   organizationProfile: ["manage"],
+  organization: ["update"],
   member: ["create", "update", "delete"],
   invitation: ["create", "cancel"],
 });
@@ -49,7 +51,7 @@ export const ownerRole = accessControl.newRole({
   exercise: ["create", "read", "update", "delete"],
   billing: ["manage"],
   organizationProfile: ["manage"],
-  organization: ["delete"],
+  organization: ["update", "delete", "transfer-ownership"],
   member: ["create", "update", "delete"],
   invitation: ["create", "cancel"],
 });
