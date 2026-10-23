@@ -103,6 +103,7 @@ Better Auth + Organization plugin is the single identity system for B2C (individ
   - `storage: "database"`, never memory: memory counts per API instance, so the real limit would multiply by the instance count. It needs better-auth >= 1.7.7's atomic `consume()`.
   - The key is the client IP from `cf-connecting-ip` alone, which is safe only because the origin accepts Cloudflare traffic only (README's Deployment notes). Never add `x-forwarded-for` or another header a client can set. A request with no trusted IP falls into one shared `no-trusted-ip` bucket (verified in 1.7.12's `rate-limiter/index.mjs`), so a missing header throttles collectively rather than not at all.
   - `rate-limit.integration.test.ts` builds extra instances via `createAuth({ rateLimitEnabled: true })` to prove the 429, per-client isolation, and the limit holding across two instances. Production code only ever uses `auth`.
+  - `rate_limit` is generated, but its `last_request` index is ours (migration 0022). Better Auth's cleanup `deleteMany(lastRequest < cutoff)` runs on every window reset, and a plain Node server awaits it inside the request. **Keep the index when merging a regenerated schema.**
 
 ### Auth-related tables are generated, never hand-edited
 
