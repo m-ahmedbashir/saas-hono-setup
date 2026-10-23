@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
 import { organizationCheckoutMutation } from "../api/mutations";
-import type { OrganizationPlanOption } from "../api/types";
+import type { OrganizationPlanOption } from "../api/service";
 import { useCheckoutAttemptKey } from "../hooks/use-checkout-attempt-key";
 import { seatQuantitySchema, type SeatQuantityValues } from "../schemas/seat-quantity.schema";
 
