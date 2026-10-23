@@ -97,12 +97,12 @@ describe("Verification email", () => {
     expect(`${link.origin}${link.pathname}`).toBe(
       `${process.env.BETTER_AUTH_URL}/api/auth/verify-email`,
     );
-    expect(link.searchParams.get("callbackURL")).toBe(`${PORTAL_URL}/profile`);
+    expect(link.searchParams.get("callbackURL")).toBe(`${PORTAL_URL}/auth/email-verified`);
 
     // Same server, this test's port (BETTER_AUTH_URL points at the dev API's port).
     const verify = await fetch(`${BASE}/verify-email${link.search}`, { redirect: "manual" });
     expect(verify.status).toBe(302);
-    expect(verify.headers.get("location")).toBe(`${PORTAL_URL}/profile`);
+    expect(verify.headers.get("location")).toBe(`${PORTAL_URL}/auth/email-verified`);
     expect(await isVerified(userId)).toBe(true);
   }, 30000);
 
@@ -117,7 +117,9 @@ describe("Verification email", () => {
     cleanupUserIds.push(((await res.json()) as { user: { id: string } }).user.id);
 
     const [message] = await emailsTo(email);
-    expect(linkIn(message!).searchParams.get("callbackURL")).toBe(`${PORTAL_URL}/profile`);
+    expect(linkIn(message!).searchParams.get("callbackURL")).toBe(
+      `${PORTAL_URL}/auth/email-verified`,
+    );
   }, 30000);
 
   it("resends the verification email on request", async () => {

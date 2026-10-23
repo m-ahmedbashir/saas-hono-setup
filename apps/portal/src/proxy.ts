@@ -10,9 +10,14 @@ const AUTHENTICATED_HOME_PATH = "/profile";
 // `/auth` — it must work for a signed-in existing member accepting an invite to a
 // *second* org, not just a brand-new signup (see its own page for the two-path flow).
 const PROTECTED_PATHS = ["/profile", "/billing", "/team"];
-// /auth pages a signed-in user may still need: accepting an invite to another org, and an
-// emailed reset link opened in a browser that's signed in (the token decides the account).
-const AUTH_PATHS_OPEN_WHEN_SIGNED_IN = ["/auth/accept-invite", "/auth/reset-password"];
+// /auth pages a signed-in user may still need: accepting an invite to another org, an
+// emailed reset link opened in a browser that's signed in (the token decides the account),
+// and the verify link's landing page (verifying itself signs the user in).
+const AUTH_PATHS_OPEN_WHEN_SIGNED_IN = [
+  "/auth/accept-invite",
+  "/auth/reset-password",
+  "/auth/email-verified",
+];
 
 // Presence-only check (Better Auth's documented Next.js middleware pattern) — fast and
 // edge-safe, not full session validation. There's no DB round trip possible here, so a

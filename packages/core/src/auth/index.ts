@@ -12,6 +12,7 @@ import {
   sendResetPasswordEmail,
   sendVerificationEmailMessage,
 } from "./emails";
+import { resolveAuthBaseUrl } from "./urls";
 
 export { statement, roles } from "./permissions";
 export {
@@ -50,7 +51,7 @@ export function createAuth(overrides: { rateLimitEnabled?: boolean } = {}) {
   return betterAuth({
     database: drizzleAdapter(db, { provider: "pg", schema }),
     secret: process.env.BETTER_AUTH_SECRET,
-    baseURL: process.env.BETTER_AUTH_URL,
+    baseURL: resolveAuthBaseUrl(process.env),
     trustedOrigins: (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000").split(","),
     emailAndPassword: {
       enabled: true,
