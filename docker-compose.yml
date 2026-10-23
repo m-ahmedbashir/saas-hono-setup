@@ -18,7 +18,9 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d saas_test"]
+      # TCP, not the Unix socket: during first-boot init the image runs a socket-only
+      # temporary server, and a socket probe would report ready before TCP clients can connect.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d saas_test"]
       interval: 1s
       timeout: 3s
       retries: 30
